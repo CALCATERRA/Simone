@@ -1,1 +1,4 @@
 appwrite
+openai
+requests
+python-dotenv
