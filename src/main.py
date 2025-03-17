@@ -1,39 +1,45 @@
-from appwrite.client import Client
-from appwrite.services.users import Users
-from appwrite.exception import AppwriteException
 import os
+import requests
+import openai
+from appwrite.client import Client
+from appwrite.exception import AppwriteException
 
-# This Appwrite function will be executed every time your function is triggered
+def get_instagram_messages():
+    token = os.getenv("INSTAGRAM_TOKEN")
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={token}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print("Errore nel recupero dei messaggi Instagram:", response.text)
+        return None
+
+def send_message_to_openai(user_message):
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": "Rispondi in modo chiaro e professionale."},
+                  {"role": "user", "content": user_message}]
+    )
+    return response["choices"][0]["message"]["content"].strip()
+
+def send_instagram_reply(user_id, response_text):
+    token = os.getenv("INSTAGRAM_TOKEN")
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={token}"
+    data = {
+        "recipient": {"id": user_id},
+        "message": {"text": response_text}
+    }
+    response = requests.post(url, json=data)
+    if response.status_code != 200:
+        print("Errore nell'invio del messaggio:", response.text)
+
 def main(context):
-    # You can use the Appwrite SDK to interact with other services
-    # For this example, we're using the Users service
-    client = (
-        Client()
-        .set_endpoint(os.environ["APPWRITE_FUNCTION_API_ENDPOINT"])
-        .set_project(os.environ["APPWRITE_FUNCTION_PROJECT_ID"])
-        .set_key(context.req.headers["x-appwrite-key"])
-    )
-    users = Users(client)
-
-    try:
-        response = users.list()
-        # Log messages and errors to the Appwrite Console
-        # These logs won't be seen by your end users
-        context.log("Total users: " + str(response["total"]))
-    except AppwriteException as err:
-        context.error("Could not list users: " + repr(err))
-
-    # The req object contains the request data
-    if context.req.path == "/ping":
-        # Use res object to respond with text(), json(), or binary()
-        # Don't forget to return a response!
-        return context.res.text("Pong")
-
-    return context.res.json(
-        {
-            "motto": "Build like a team of hundreds_",
-            "learn": "https://appwrite.io/docs",
-            "connect": "https://appwrite.io/discord",
-            "getInspired": "https://builtwith.appwrite.io",
-        }
-    )
+    messages = get_instagram_messages()
+    if messages and "data" in messages:
+        for msg in messages["data"]:
+            user_id = msg["sender"]["id"]
+            user_message = msg["message"]["text"]
+            response_text = send_message_to_openai(user_message)
+            send_instagram_reply(user_id, response_text)
+    return context.res.text("Execution complete.")
