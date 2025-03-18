@@ -35,6 +35,15 @@ def send_instagram_reply(user_id, response_text):
         print("Errore nell'invio del messaggio:", response.text)
 
 def main(context):
+    # **Gestione della verifica del webhook di Meta**
+    mode = context.req.query.get("hub.mode")
+    challenge = context.req.query.get("hub.challenge")
+    verify_token = context.req.query.get("hub.verify_token")
+
+    if mode == "subscribe" and verify_token == os.getenv("VERIFY_TOKEN"):
+        return context.res.text(challenge)  #  RESTITUISCE IL CHALLENGE A META PER COMPLETARE LA VERIFICA
+
+    # **Dopo la verifica, gestisci i messaggi di Instagram**
     messages = get_instagram_messages()
     if messages and "data" in messages:
         for msg in messages["data"]:
@@ -42,4 +51,5 @@ def main(context):
             user_message = msg["message"]["text"]
             response_text = send_message_to_openai(user_message)
             send_instagram_reply(user_id, response_text)
+
     return context.res.text("Execution complete.")
