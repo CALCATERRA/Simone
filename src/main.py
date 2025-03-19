@@ -47,8 +47,8 @@ def send_message_to_openai(user_message):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": custom_prompt},
-              {"role": "user", "content": user_message}]
-)
+                  {"role": "user", "content": user_message}]
+    )
 
     return response["choices"][0]["message"]["content"].strip()
 
