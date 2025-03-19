@@ -40,16 +40,15 @@ def send_message_to_openai(user_message):
     openai.api_key = os.getenv("OPENAI_API_KEY")
     system_prompt = get_prompt()  # Legge il prompt personalizzato
 
-    # 📌 Carica il prompt personalizzato dal file
+# 📌 Carica il prompt personalizzato dal file
 with open("prompt.txt", "r", encoding="utf-8") as f:
     custom_prompt = f.read().strip()
 
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": custom_prompt},
-                  {"role": "user", "content": user_message}]
-    )
-
+response = openai.ChatCompletion.create(
+    model="gpt-3.5-turbo",
+    messages=[{"role": "system", "content": custom_prompt},
+              {"role": "user", "content": user_message}]
+)
 
     return response["choices"][0]["message"]["content"].strip()
 
