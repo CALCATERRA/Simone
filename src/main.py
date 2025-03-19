@@ -13,7 +13,7 @@ def read_prompt():
 
 # Recupera i messaggi da Messenger e Instagram
 def get_messages(token):
-    url = f"https://graph.facebook.com/v18.0/me/conversations?fields=messages{access_token={token}"
+    url = f"https://graph.facebook.com/v18.0/me/conversations?fields=messages&access_token={token}"
     response = requests.get(url)
     
     if response.status_code == 200:
