@@ -40,6 +40,9 @@ def send_message_to_openai(user_message):
     openai.api_key = os.getenv("OPENAI_API_KEY")
     system_prompt = get_prompt()  # Legge il prompt personalizzato
 
+    with open("prompt.txt", "r", encoding="utf-8") as f:
+        custom_prompt = f.read().strip()
+
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "system", "content": system_prompt},
