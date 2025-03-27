@@ -26,7 +26,7 @@ def get_messenger_messages():
 # Funzione per ottenere i messaggi da Instagram
 def get_instagram_messages():
     token = os.getenv("INSTAGRAM_TOKEN")
-    url = f"https://graph.instagram.com/v18.0/me/conversations?fields=messages{{message,from,id,created_time}}&access_token={token}"
+    url = f"https://graph.instagram.com/v18.0/me/conversations?fields=messages{message,from,id,created_time}&access_token={token}"
     
     try:
         response = requests.get(url)
