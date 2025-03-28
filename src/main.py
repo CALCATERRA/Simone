@@ -4,7 +4,7 @@ import requests
 import openai
 
 STATE_FILE = "last_message_ids.json"
-MY_INSTAGRAM_ID = "17841464183957073"  # <-- Il tuo ID
+MY_INSTAGRAM_ID = "17841464183957073"  # Il tuo ID Instagram
 
 # === Lettura prompt ===
 def get_prompt():
@@ -43,7 +43,9 @@ def get_instagram_messages():
 def send_message_to_openai(user_message):
     openai.api_key = os.getenv("OPENAI_API_KEY")
     prompt = get_prompt()
+    
     try:
+        # Chiamata API OpenAI
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -51,9 +53,15 @@ def send_message_to_openai(user_message):
                 {"role": "user", "content": user_message}
             ]
         )
-        return response["choices"][0]["message"]["content"].strip()
+        
+        # Verifica se la risposta di OpenAI è valida
+        message = response["choices"][0]["message"]["content"].strip()
+        if message:
+            return message
+        else:
+            return "Ops! Qualcosa è andato storto."
     except Exception as e:
-        print("[ERRORE] OpenAI:", e)
+        print(f"[ERRORE] OpenAI: {e}")
         return "Ops! Qualcosa è andato storto."
 
 # === Instagram: invia risposta ===
@@ -66,7 +74,7 @@ def send_instagram_reply(user_id, text):
     }
     response = requests.post(url, json=data)
     if response.status_code != 200:
-        print("[ERRORE] Invio messaggio Instagram:", response.text)
+        print(f"[ERRORE] Invio messaggio Instagram: {response.text}")
     else:
         print(f"[INFO] Risposta inviata a {user_id}")
 
@@ -95,15 +103,18 @@ def main(context):
                     print(f"[DEBUG] Mittente ID: {sender_id}")
                     print(f"[DEBUG] Contenuto: {text}")
 
+                    # Evita di rispondere due volte allo stesso messaggio
                     if msg_id in processed["instagram"]:
                         print("[DEBUG] Già risposto. Skip.")
                         continue
 
+                    # Evita di rispondere ai messaggi inviati da te stesso
                     if sender_id == MY_INSTAGRAM_ID:
                         print("[DEBUG] Messaggio inviato da me. Ignorato.")
                         processed["instagram"].append(msg_id)
                         continue
 
+                    # Se il messaggio è valido, rispondi
                     if text:
                         reply = send_message_to_openai(text)
 
@@ -118,4 +129,3 @@ def main(context):
 
     save_processed_ids(processed)
     return context.res.text("Esecuzione completata.")
-
