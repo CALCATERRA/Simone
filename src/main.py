@@ -95,10 +95,21 @@ def main(context):
     if mode == "subscribe" and verify_token == os.getenv("VERIFY_TOKEN"):
         return context.res.text(challenge)
 
+    # Recupero e risposta ai messaggi Messenger
+    messenger_messages = get_messengermessages()
+    if messenger_messages and "data" in messenger_messages:
+        for msg in messenger_messages["data"]:
+            user_id = msg.get("id")  
+            user_message = msg.get("message", {}).get("text", "")
+
+            if user_id and user_message:
+                response_text = send_message_to_openai(user_message)
+                send_messenger_reply(user_id, response_text)
+
     # Recupero e risposta ai messaggi Instagram
-    instagrammessages = get_instagrammessages()
-    if instagrammessages and "data" in instagrammessages:
-        for msg in instagrammessages["data"]:
+    instagram_messages = get_instagrammessages()
+    if instagram_messages and "data" in instagram_messages:
+        for msg in instagram_messages["data"]:
             user_id = msg.get("id")  
             user_message = msg.get("message", {}).get("text", "")
 
