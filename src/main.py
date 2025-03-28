@@ -4,6 +4,7 @@ import requests
 import openai
 
 STATE_FILE = "last_message_ids.json"
+MY_INSTAGRAM_ID = "17841464183957073"  # <-- Il tuo ID
 
 # === Lettura prompt ===
 def get_prompt():
@@ -95,17 +96,17 @@ def main(context):
                     print(f"[DEBUG] Mittente ID: {sender_id}")
                     print(f"[DEBUG] Contenuto: {text}")
 
-                    # Blocca il messaggio se l'hai già risposto
+                    # Blocca se già risposto
                     if msg_id in processed["instagram"]:
                         print("[DEBUG] Già risposto. Skip.")
                         continue
 
-                    # BLOCCO ANTI-LOOP: ignora se il messaggio è inviato da te
-                    if sender_id in ["INSERISCI_TUO_ID_INSTAGRAM"]:
+                    # BLOCCO LOOP: ignora se sei tu il mittente
+                    if sender_id == MY_INSTAGRAM_ID:
                         print("[DEBUG] Messaggio inviato da me. Ignorato.")
                         continue
 
-                    # Se c'è testo valido, rispondi
+                    # Rispondi solo se c'è testo
                     if text:
                         reply = send_message_to_openai(text)
                         send_instagram_reply(sender_id, reply)
