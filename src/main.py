@@ -25,19 +25,19 @@ def get_messengermessages():
         return None
 
 # Funzione per ottenere i messaggi da Instagram
-#def get_instagrammessages():
- #   print("Funzione get_instagrammessages() chiamata!")
-  #  token = os.getenv("INSTAGRAM_TOKEN")
-   # url = f"https://graph.instagram.com/v18.0/me/conversations?fields=messages{{message,from,id,created_time}}&access_token={token}"
-    #response = requests.get(url)
+def get_instagrammessages():
+    print("Funzione get_instagrammessages() chiamata!")
+    token = os.getenv("INSTAGRAM_TOKEN")
+    url = f"https://graph.instagram.com/v18.0/me/conversations?fields=messages{{message,from,id,created_time}}&access_token={token}"
+    response = requests.get(url)
 
-    #if response.status_code == 200:
-     #   return response.json()
-    #else:
-      #  print("Errore nel recupero dei messaggi Instagram:", response.text)
-       # return None
-# Esempio di chiamata
-#print(get_instagrammessages())
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print("Errore nel recupero dei messaggi Instagram:", response.text)
+        return None
+ Esempio di chiamata
+print(get_instagrammessages())
         
 # Funzione per inviare il messaggio a OpenAI
 def send_message_to_openai(user_message):
