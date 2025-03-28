@@ -15,7 +15,7 @@ def get_prompt():
 def get_messengermessages():
     print("Funzione get_messengermessages() chiamata!")
     token = os.getenv("MESSENGER_TOKEN")
-    url = f"https://graph.facebook.com/v18.0/me/conversations?fields=messages&access_token={token}"
+    url = f"https://graph.facebook.com/v18.0/me/conversations?fields=messages{{message,from,id,created_time}}&access_token={token}"
     response = requests.get(url)
 
     if response.status_code == 200:
@@ -94,9 +94,9 @@ def main(context):
         return context.res.text(challenge)
 
     # Recupero e risposta ai messaggi Instagram
-    instagram_messages = get_instagrammessages()
-    if instagram_messages and "data" in instagram_messages:
-        for msg in instagram_messages["data"]:
+    instagrammessages = get_instagrammessages()
+    if instagrammessages and "data" in instagrammessages:
+        for msg in instagrammessages["data"]:
             user_id = msg.get("id")  
             user_message = msg.get("message", {}).get("text", "")
 
