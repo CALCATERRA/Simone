@@ -66,6 +66,8 @@ def send_instagram_reply(user_id, text):
     response = requests.post(url, json=data)
     if response.status_code != 200:
         print("[ERRORE] Invio messaggio Instagram:", response.text)
+    else:
+        print(f"[INFO] Risposta inviata a {user_id}")
 
 # === Funzione principale ===
 def main(context):
@@ -78,27 +80,33 @@ def main(context):
         return context.res.text(challenge)
 
     processed = load_processed_ids()
-    page_id = os.getenv("INSTAGRAM_PAGE_ID")
 
-    # === Lettura e risposta ai messaggi Instagram ===
     instagram_data = get_instagram_messages()
     if instagram_data and "data" in instagram_data:
         for conv in instagram_data["data"]:
             if "messages" in conv:
                 for msg in conv["messages"]["data"]:
-                    msg_id = msg["id"]
-                    sender_id = msg["from"]["id"]
+                    msg_id = msg.get("id")
+                    sender_id = msg.get("from", {}).get("id")
+                    text = msg.get("message", "")
 
-                    # Evita di rispondere ai propri messaggi
-                    if sender_id == page_id:
-                        continue
+                    # Log di debug
+                    print(f"\n[DEBUG] ID messaggio: {msg_id}")
+                    print(f"[DEBUG] Mittente ID: {sender_id}")
+                    print(f"[DEBUG] Contenuto: {text}")
 
+                    # Blocca il messaggio se l'hai già risposto
                     if msg_id in processed["instagram"]:
+                        print("[DEBUG] Già risposto. Skip.")
                         continue
 
-                    text = msg.get("message")
+                    # BLOCCO ANTI-LOOP: ignora se il messaggio è inviato da te
+                    if sender_id in ["INSERISCI_TUO_ID_INSTAGRAM"]:
+                        print("[DEBUG] Messaggio inviato da me. Ignorato.")
+                        continue
+
+                    # Se c'è testo valido, rispondi
                     if text:
-                        print(f"[Instagram] Nuovo messaggio da {sender_id}: {text}")
                         reply = send_message_to_openai(text)
                         send_instagram_reply(sender_id, reply)
                         processed["instagram"].append(msg_id)
