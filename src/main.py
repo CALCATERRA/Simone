@@ -11,37 +11,34 @@ def get_prompt():
         with open("prompt.txt", "r", encoding="utf-8") as file:
             return file.read().strip()
     except Exception as e:
-        print(f"[ERRORE] prompt.txt: {e}")
+        print(f"[ERRORE] Lettura prompt.txt: {e}")
         return "Sei Simone, una ragazza ironica e spontanea. Non chiedere mai come puoi aiutare."
 
-# === Carica messaggi già risposti ===
+# === Stato: caricamento/salvataggio ===
 def load_processed_ids():
     try:
         with open(STATE_FILE, "r") as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"messenger": [], "instagram": []}
+        return {"instagram": []}
 
-# === Salva nuovi ID messaggi ===
 def save_processed_ids(data):
     with open(STATE_FILE, "w") as f:
         json.dump(data, f)
 
-# === API: Messenger ===
-def get_messenger_messages():
-    token = os.getenv("MESSENGER_TOKEN")
-    url = f"https://graph.facebook.com/v18.0/me/conversations?fields=messages{{message,from,id,created_time}}&access_token={token}"
-    response = requests.get(url)
-    return response.json() if response.status_code == 200 else None
-
-# === API: Instagram ===
+# === Instagram: recupero messaggi ===
 def get_instagram_messages():
+    print("[INFO] Chiamata a get_instagram_messages()")
     token = os.getenv("INSTAGRAM_TOKEN")
-    url = f"https://graph.instagram.com/v18.0/me/conversations?fields=messages{{message,from,id,created_time}}&access_token={token}"
+    url = f"https://graph.instagram.com/v18.0/me/conversations?fields=messages{{id,message,from,created_time}}&access_token={token}"
     response = requests.get(url)
-    return response.json() if response.status_code == 200 else None
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print("[ERRORE] Recupero messaggi Instagram:", response.text)
+        return None
 
-# === OpenAI ===
+# === OpenAI: invio prompt ===
 def send_message_to_openai(user_message):
     openai.api_key = os.getenv("OPENAI_API_KEY")
     prompt = get_prompt()
@@ -55,28 +52,24 @@ def send_message_to_openai(user_message):
         )
         return response["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        print(f"[ERRORE OpenAI] {e}")
+        print("[ERRORE] OpenAI:", e)
         return "Ops! Qualcosa è andato storto."
 
-# === Risposte ===
-def send_messenger_reply(user_id, text):
-    token = os.getenv("MESSENGER_TOKEN")
-    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={token}"
-    data = {"recipient": {"id": user_id}, "message": {"text": text}}
-    res = requests.post(url, json=data)
-    if res.status_code != 200:
-        print(f"[ERRORE] Messenger reply: {res.text}")
-
+# === Instagram: invia risposta ===
 def send_instagram_reply(user_id, text):
     token = os.getenv("INSTAGRAM_TOKEN")
     url = f"https://graph.instagram.com/v18.0/me/messages?access_token={token}"
-    data = {"recipient": {"id": user_id}, "message": {"text": text}}
-    res = requests.post(url, json=data)
-    if res.status_code != 200:
-        print(f"[ERRORE] Instagram reply: {res.text}")
+    data = {
+        "recipient": {"id": user_id},
+        "message": {"text": text}
+    }
+    response = requests.post(url, json=data)
+    if response.status_code != 200:
+        print("[ERRORE] Invio messaggio Instagram:", response.text)
 
 # === Funzione principale ===
 def main(context):
+    # Verifica webhook Meta
     mode = context.req.query.get("hub.mode")
     challenge = context.req.query.get("hub.challenge")
     verify_token = context.req.query.get("hub.verify_token")
@@ -84,45 +77,31 @@ def main(context):
     if mode == "subscribe" and verify_token == os.getenv("VERIFY_TOKEN"):
         return context.res.text(challenge)
 
-    # Stato messaggi
     processed = load_processed_ids()
+    page_id = os.getenv("INSTAGRAM_PAGE_ID")
 
-    # === Messenger ===
-    messenger_data = get_messenger_messages()
-    if messenger_data and "data" in messenger_data:
-        for conv in messenger_data["data"]:
-            if "messages" in conv:
-                for msg in conv["messages"]["data"]:
-                    msg_id = msg["id"]
-                    if msg_id in processed["messenger"]:
-                        continue  # già risposto
-
-                    user_id = msg["from"]["id"]
-                    text = msg.get("message")
-                    if text:
-                        print(f"[Messenger] {text}")
-                        reply = send_message_to_openai(text)
-                        send_messenger_reply(user_id, reply)
-                        processed["messenger"].append(msg_id)
-
-    # === Instagram ===
+    # === Lettura e risposta ai messaggi Instagram ===
     instagram_data = get_instagram_messages()
     if instagram_data and "data" in instagram_data:
         for conv in instagram_data["data"]:
             if "messages" in conv:
                 for msg in conv["messages"]["data"]:
                     msg_id = msg["id"]
-                    if msg_id in processed["instagram"]:
-                        continue  # già risposto
+                    sender_id = msg["from"]["id"]
 
-                    user_id = msg["from"]["id"]
+                    # Evita di rispondere ai propri messaggi
+                    if sender_id == page_id:
+                        continue
+
+                    if msg_id in processed["instagram"]:
+                        continue
+
                     text = msg.get("message")
                     if text:
-                        print(f"[Instagram] {text}")
+                        print(f"[Instagram] Nuovo messaggio da {sender_id}: {text}")
                         reply = send_message_to_openai(text)
-                        send_instagram_reply(user_id, reply)
+                        send_instagram_reply(sender_id, reply)
                         processed["instagram"].append(msg_id)
 
-    # === Salva nuovi ID
     save_processed_ids(processed)
     return context.res.text("Esecuzione completata.")
