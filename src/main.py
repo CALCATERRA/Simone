@@ -19,7 +19,7 @@ def get_messengermessages():
     response = requests.get(url)
 
     if response.status_code == 200:
-        print("Messenger chiamata:", response.text)
+        print("Messenger chiamata:")
         return response.json()
     else:
         print("Errore nel recupero dei messaggi Messenger:", response.text)
