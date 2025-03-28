@@ -23,6 +23,8 @@ def get_messengermessages():
     else:
         print("Errore nel recupero dei messaggi Messenger:", response.text)
         return None
+# Esempio di chiamata
+print(get_messengermessages())
 
 # Funzione per ottenere i messaggi da Instagram
 #def get_instagrammessages():
