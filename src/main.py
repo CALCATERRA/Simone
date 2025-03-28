@@ -13,6 +13,7 @@ def get_prompt():
 
 # Funzione per ottenere i messaggi da Messenger
 def get_messengermessages():
+    print("Funzione get_messengermessages() chiamata!")
     token = os.getenv("MESSENGER_TOKEN")
     url = f"https://graph.facebook.com/v18.0/me/conversations?fields=messages&access_token={token}"
     response = requests.get(url)
