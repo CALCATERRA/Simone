@@ -27,17 +27,17 @@ def get_messengermessages():
 print(get_messengermessages())
 
 # Funzione per ottenere i messaggi da Instagram
-#def get_instagrammessages():
-#    print("Funzione get_instagrammessages() chiamata!")
-#    token = os.getenv("INSTAGRAM_TOKEN")
-#    url = f"https://graph.instagram.com/v18.0/me/conversations?fields=messages{{message,from,id,created_time}}&access_token={token}"
-#    response = requests.get(url)
+def get_instagrammessages():
+    print("Funzione get_instagrammessages() chiamata!")
+    token = os.getenv("INSTAGRAM_TOKEN")
+    url = f"https://graph.instagram.com/v18.0/me/conversations?fields=messages{{message,from,id,created_time}}&access_token={token}"
+    response = requests.get(url)
 
-#    if response.status_code == 200:
-#        return response.json()
-#    else:
-#        print("Errore nel recupero dei messaggi Instagram:", response.text)
-#        return None
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print("Errore nel recupero dei messaggi Instagram:", response.text)
+        return None
 # Esempio di chiamata
 #print(get_instagrammessages())
         
@@ -96,14 +96,14 @@ def main(context):
         return context.res.text(challenge)
 
     # Recupero e risposta ai messaggi Instagram
-   # instagrammessages = get_instagrammessages()
-   # if instagrammessages and "data" in instagrammessages:
-   #     for msg in instagrammessages["data"]:
-   #         user_id = msg.get("id")  
-   #         user_message = msg.get("message", {}).get("text", "")
+    instagrammessages = get_instagrammessages()
+    if instagrammessages and "data" in instagrammessages:
+        for msg in instagrammessages["data"]:
+            user_id = msg.get("id")  
+            user_message = msg.get("message", {}).get("text", "")
 
-   #         if user_id and user_message:
-   #             response_text = send_message_to_openai(user_message)
-   #             send_instagram_reply(user_id, response_text)
+            if user_id and user_message:
+                response_text = send_message_to_openai(user_message)
+                send_instagram_reply(user_id, response_text)
 
     return context.res.text("Execution complete.")
