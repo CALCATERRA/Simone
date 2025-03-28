@@ -37,7 +37,7 @@ def get_instagrammessages():
         print("Errore nel recupero dei messaggi Instagram:", response.text)
         return None
 # Esempio di chiamata
-print(get_instagrammessages())
+#print(get_instagrammessages())
         
 # Funzione per inviare il messaggio a OpenAI
 def send_message_to_openai(user_message):
