@@ -55,7 +55,7 @@ def main(req, res):
             username = "simonefoulesol"
 
             # Ottieni l'ID della pagina Instagram dal nome utente
-            user_url = f"https://graph.facebook.com/v18.0/{username}?fields=id&access_token={instagram_token}"
+            user_url = f"https://graph.instagram.com/v18.0/{username}?fields=id&access_token={instagram_token}"
             user_res = requests.get(user_url)
             user_id = user_res.json().get("id")
 
@@ -63,7 +63,7 @@ def main(req, res):
                 print("Errore: impossibile ottenere l'ID dell'utente Instagram.")
                 return res.json({"error": "Instagram ID not found"}, 500)
 
-            message_url = f"https://graph.facebook.com/v18.0/{user_id}/messages"
+            message_url = f"https://graph.instagram.com/v18.0/{user_id}/messages"
             payload = {
                 "messaging_product": "instagram",
                 "recipient": {"id": sender_id},
