@@ -1,81 +1,75 @@
 import os
 import json
-import openai
 import requests
+import openai
 
-def main(req, res):
+def main(context):
     try:
-        body = json.loads(req.body.decode("utf-8") or "{}")
-        print("Request body:", body)
+        context.log("Funzione avviata")
 
-        # Verifica del webhook (Messenger)
-        if req.method == "GET":
-            mode = req.query.get("hub.mode")
-            token = req.query.get("hub.verify_token")
-            challenge = req.query.get("hub.challenge")
+        # Legge il prompt dal file
+        with open("prompt.txt", "r") as f:
+            prompt_prefix = f.read()
 
-            if mode == "subscribe" and token == os.environ["VERIFY_TOKEN"]:
-                return res.json({"challenge": challenge})
-            else:
-                return res.json({"error": "Verification failed"}, 403)
+        instagram_token = os.environ["INSTAGRAM_TOKEN"]
+        openai.api_key = os.environ["OPENAI_API_KEY"]
 
-        # POST - Messaggio in arrivo
-        if req.method == "POST":
-            entry = body.get("entry", [])[0]
-            changes = entry.get("changes", [])[0]
-            value = changes.get("value", {})
-            messages = value.get("messages", [])
-            
-            if not messages:
-                return res.send("No message to process.")
+        # Recupera le conversazioni recenti da Instagram
+        convo_url = f"https://graph.instagram.com/v18.0/me/conversations"
+        convo_params = {
+            "fields": "messages{message,from,id,created_time}",
+            "access_token": instagram_token
+        }
+        convo_res = requests.get(convo_url, params=convo_params)
+        convo_data = convo_res.json()
 
-            message = messages[0]
-            sender_id = message["from"]
-            user_text = message["text"]["body"]
-            print(f"Ricevuto da Instagram: {user_text}")
+        if "data" not in convo_data or not convo_data["data"]:
+            context.log("Nessuna conversazione trovata.")
+            return context.res.send("Nessun messaggio.")
 
-            # Carica il prompt da file
-            with open("prompt.txt", "r") as f:
-                prompt_prefix = f.read()
+        last_convo = convo_data["data"][0]
+        messages = last_convo.get("messages", {}).get("data", [])
 
-            prompt = f"{prompt_prefix}\n\nUtente: {user_text}\nAssistente:"
+        if not messages:
+            context.log("Nessun messaggio nella conversazione.")
+            return context.res.send("Nessun messaggio utile.")
 
-            # Chiamata a OpenAI
-            openai.api_key = os.environ["OPENAI_API_KEY"]
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "system", "content": prompt_prefix}, {"role": "user", "content": user_text}]
-            )
-            reply = response.choices[0].message["content"].strip()
-            print(f"Risposta generata: {reply}")
+        # Trova l'ultimo messaggio dell'utente
+        last_msg = messages[0]
+        user_id = last_msg["from"]["id"]
+        user_text = last_msg["message"]
 
-            # Invia la risposta su Instagram
-            instagram_token = os.environ["INSTAGRAM_TOKEN"]
-            username = "simonefoulesol"
+        context.log(f"Messaggio ricevuto da {user_id}: {user_text}")
 
-            # Ottieni l'ID della pagina Instagram dal nome utente
-            user_url = f"https://graph.instagram.com/v18.0/{username}?fields=id&access_token={instagram_token}"
-            user_res = requests.get(user_url)
-            user_id = user_res.json().get("id")
+        # Costruisce il prompt completo
+        prompt = f"{prompt_prefix}\n\nUtente: {user_text}\nAssistente:"
 
-            if not user_id:
-                print("Errore: impossibile ottenere l'ID dell'utente Instagram.")
-                return res.json({"error": "Instagram ID not found"}, 500)
+        # Chiamata a OpenAI per generare la risposta
+        ai_response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": prompt_prefix},
+                {"role": "user", "content": user_text}
+            ]
+        )
 
-            message_url = f"https://graph.instagram.com/v18.0/{user_id}/messages"
-            payload = {
-                "messaging_product": "instagram",
-                "recipient": {"id": sender_id},
-                "message": {"text": reply}
-            }
-            headers = {"Content-Type": "application/json"}
-            r = requests.post(message_url, headers=headers, json=payload, params={"access_token": instagram_token})
+        reply_text = ai_response.choices[0].message["content"].strip()
+        context.log(f"Risposta generata: {reply_text}")
 
-            print(f"Risposta inviata: {r.status_code} - {r.text}")
-            return res.send("OK")
+        # Invia la risposta all'utente su Instagram
+        send_url = f"https://graph.instagram.com/v18.0/me/messages"
+        send_payload = {
+            "recipient": {"id": user_id},
+            "message": {"text": reply_text}
+        }
+        send_headers = {"Content-Type": "application/json"}
+        send_params = {"access_token": instagram_token}
 
-        return res.send("Unsupported method", 405)
+        send_res = requests.post(send_url, headers=send_headers, json=send_payload, params=send_params)
+        context.log(f"Risposta inviata: {send_res.status_code} - {send_res.text}")
+
+        return context.res.send("OK")
 
     except Exception as e:
-        print("Errore:", str(e))
-        return res.json({"error": str(e)}, 500)
+        context.error(f"Errore: {str(e)}")
+        return context.res.json({"error": str(e)}, 500)
