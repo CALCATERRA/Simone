@@ -1,4 +1,5 @@
+appwrite
 openai
 requests
-flask
+python-dotenv
 
