@@ -5,7 +5,6 @@ import requests
 
 def main(req, res):
     try:
-        # Accesso al body della richiesta HTTP
         body = json.loads(req.body.decode("utf-8") or "{}")
         print("Request body:", body)
 
