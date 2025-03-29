@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-import openai
+from openai import OpenAI
 
 def main(context):
     try:
@@ -12,7 +12,7 @@ def main(context):
             prompt_prefix = f.read()
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
-        openai.api_key = os.environ["OPENAI_API_KEY"]
+        openai_api_key = os.environ["OPENAI_API_KEY"]
 
         # Recupera le conversazioni recenti da Instagram
         convo_url = f"https://graph.instagram.com/v18.0/me/conversations"
@@ -44,8 +44,9 @@ def main(context):
         # Costruisce il prompt completo
         prompt = f"{prompt_prefix}\n\nUtente: {user_text}\nAssistente:"
 
-        # Chiamata a OpenAI per generare la risposta
-        ai_response = openai.ChatCompletion.create(
+        # Chiamata a OpenAI con nuova sintassi
+        client = OpenAI(api_key=openai_api_key)
+        ai_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": prompt_prefix},
@@ -53,7 +54,7 @@ def main(context):
             ]
         )
 
-        reply_text = ai_response.choices[0].message["content"].strip()
+        reply_text = ai_response.choices[0].message.content.strip()
         context.log(f"Risposta generata: {reply_text}")
 
         # Invia la risposta all'utente su Instagram
