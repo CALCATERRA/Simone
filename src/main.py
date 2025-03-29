@@ -15,7 +15,7 @@ def main(context):
         openai_api_key = os.environ["OPENAI_API_KEY"]
 
         # Recupera le conversazioni recenti da Instagram
-        convo_url = f"https://graph.instagram.com/v18.0/me/conversations"
+        convo_url = "https://graph.instagram.com/v18.0/me/conversations"
         convo_params = {
             "fields": "messages{message,from,id,created_time}",
             "access_token": instagram_token
@@ -34,8 +34,8 @@ def main(context):
             context.log("Nessun messaggio nella conversazione.")
             return context.res.send("Nessun messaggio utile.")
 
-        # Trova l'ultimo messaggio dell'utente
-        last_msg = messages[0]
+        # Trova l'ultimo messaggio ricevuto
+        last_msg = messages[-1]  # <-- prende l'ultimo messaggio
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
 
@@ -58,7 +58,7 @@ def main(context):
         context.log(f"Risposta generata: {reply_text}")
 
         # Invia la risposta all'utente su Instagram
-        send_url = f"https://graph.instagram.com/v18.0/me/messages"
+        send_url = "https://graph.instagram.com/v18.0/me/messages"
         send_payload = {
             "recipient": {"id": user_id},
             "message": {"text": reply_text}
