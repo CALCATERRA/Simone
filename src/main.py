@@ -1,78 +1,85 @@
 import os
 import json
+import openai
 import requests
-from flask import Flask, request
-from openai import OpenAI
 
-app = Flask(__name__)
+def main(req, res):
+    try:
+        body = json.loads(req.body or "{}")
+        print("Request body:", body)
 
-VERIFY_TOKEN = os.environ['VERIFY_TOKEN']
-MESSENGER_TOKEN = os.environ['MESSENGER_TOKEN']
-INSTAGRAM_TOKEN = os.environ['INSTAGRAM_TOKEN']
-OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
-INSTAGRAM_USERNAME = "simonefoulesol"
+        # Verifica del webhook (Messenger)
+        if req.method == "GET":
+            mode = req.query.get("hub.mode")
+            token = req.query.get("hub.verify_token")
+            challenge = req.query.get("hub.challenge")
 
-openai = OpenAI(api_key=OPENAI_API_KEY)
+            if mode == "subscribe" and token == os.environ["VERIFY_TOKEN"]:
+                return res.send(challenge)
+            else:
+                return res.json({"error": "Verification failed"}, 403)
 
-def get_prompt():
-    with open("prompt.txt", "r") as f:
-        return f.read()
+        # POST - Messaggio in arrivo
+        if req.method == "POST":
+            entry = body.get("entry", [])[0]
+            changes = entry.get("changes", [])[0]
+            value = changes.get("value", {})
+            messages = value.get("messages", [])
+            
+            if not messages:
+                return res.send("No message to process.")
 
-def generate_response(user_message):
-    prompt = get_prompt()
-    full_prompt = f"{prompt}\n\nDomanda: {user_message}\nRisposta:"
-    completion = openai.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": full_prompt}],
-        temperature=0.7
-    )
-    return completion.choices[0].message.content.strip()
+            message = messages[0]
+            sender_id = message["from"]
+            user_text = message["text"]["body"]
+            print(f"Ricevuto da Instagram: {user_text}")
 
-def send_messenger_message(recipient_id, message):
-    url = f"https://graph.facebook.com/v17.0/me/messages?access_token={MESSENGER_TOKEN}"
-    data = {
-        "recipient": {"id": recipient_id},
-        "message": {"text": message}
-    }
-    requests.post(url, json=data)
+            # Carica il prompt da file
+            with open("prompt.txt", "r") as f:
+                prompt_prefix = f.read()
 
-def send_instagram_message(user_id, message):
-    url = f"https://graph.instagram.com/v17.0/me/messages?access_token={INSTAGRAM_TOKEN}"
-    data = {
-        "recipient": {"id": user_id},
-        "message": {"text": message},
-        "messaging_type": "RESPONSE",
-        "tag": "ACCOUNT_UPDATE"
-    }
-    requests.post(url, json=data)
+            prompt = f"{prompt_prefix}\n\nUtente: {user_text}\nAssistente:"
 
-@app.route("/", methods=["GET"])
-def verify():
-    if request.args.get("hub.mode") == "subscribe" and request.args.get("hub.verify_token") == VERIFY_TOKEN:
-        return request.args.get("hub.challenge"), 200
-    return "Verification failed", 403
+            # Chiamata a OpenAI
+            openai.api_key = os.environ["OPENAI_API_KEY"]
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": prompt_prefix},
+                    {"role": "user", "content": user_text}
+                ]
+            )
+            reply = response.choices[0].message["content"].strip()
+            print(f"Risposta generata: {reply}")
 
-@app.route("/", methods=["POST"])
-def webhook():
-    payload = request.json
+            # Invia la risposta su Instagram
+            instagram_token = os.environ["INSTAGRAM_TOKEN"]
+            username = "simonefoulesol"
 
-    if payload.get("object") == "page":
-        for entry in payload.get("entry", []):
-            for messaging_event in entry.get("messaging", []):
-                sender_id = messaging_event.get("sender", {}).get("id")
-                message = messaging_event.get("message", {}).get("text")
+            # Ottieni l'ID della pagina Instagram dal nome utente
+            user_url = f"https://graph.instagram.com/v18.0/{username}?fields=id&access_token={instagram_token}"
+            user_res = requests.get(user_url)
+            user_id = user_res.json().get("id")
 
-                if sender_id and message:
-                    response = generate_response(message)
-                    send_messenger_message(sender_id, response)
+            if not user_id:
+                print("Errore: impossibile ottenere l'ID dell'utente Instagram.")
+                return res.json({"error": "Instagram ID not found"}, 500)
 
-            for messaging_event in entry.get("messaging", []):
-                if "message" in messaging_event and messaging_event.get("sender", {}).get("username") != INSTAGRAM_USERNAME:
-                    sender_id = messaging_event["sender"]["id"]
-                    message = messaging_event["message"].get("text")
+            message_url = f"https://graph.instagram.com/v18.0/{user_id}/messages"
+            payload = {
+                "messaging_product": "instagram",
+                "recipient": {"id": sender_id},
+                "message": {"text": reply}
+            }
+            headers = {"Content-Type": "application/json"}
+            r = requests.post(message_url, headers=headers, json=payload, params={"access_token": instagram_token})
 
-                    if sender_id and message:
-                        response = generate_response(message)
-                        send_instagram_message(sender_id, response)
+            print(f"Risposta inviata: {r.status_code} - {r.text}")
+            return res.send("OK")
 
-    return "ok", 200
+        return res.send("Unsupported method", 405)
+
+    except Exception as e:
+        print("Errore:", str(e))
+        return res.json({"error": str(e)}, 500)
+
