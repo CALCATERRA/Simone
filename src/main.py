@@ -37,7 +37,7 @@ def send_messenger_message(recipient_id, message):
     requests.post(url, json=data)
 
 def send_instagram_message(user_id, message):
-    url = f"https://graph.facebook.com/v17.0/me/messages?access_token={INSTAGRAM_TOKEN}"
+    url = f"https://graph.instagram.com/v17.0/me/messages?access_token={INSTAGRAM_TOKEN}"
     data = {
         "recipient": {"id": user_id},
         "message": {"text": message},
