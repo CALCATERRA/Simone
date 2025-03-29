@@ -3,32 +3,32 @@ import json
 import openai
 import requests
 
-def main(req):
+def main(req, res):
     try:
-        # Appwrite potrebbe passare i dati come 'req.body'
-        body = json.loads(req.get('body', '{}'))
+        # Appwrite ti fornisce direttamente il body come req.body, quindi possiamo fare json.loads su req.body
+        body = json.loads(req.body.decode("utf-8") or "{}")
         print("Request body:", body)
 
         # Verifica del webhook (Messenger)
-        if req.get('method') == "GET":
-            mode = req.get("query").get("hub.mode")
-            token = req.get("query").get("hub.verify_token")
-            challenge = req.get("query").get("hub.challenge")
+        if req.method == "GET":
+            mode = req.query.get("hub.mode")
+            token = req.query.get("hub.verify_token")
+            challenge = req.query.get("hub.challenge")
 
             if mode == "subscribe" and token == os.environ["VERIFY_TOKEN"]:
-                return {"body": challenge}
+                return res.json({"challenge": challenge})
             else:
-                return {"status": "error", "message": "Verification failed"}
+                return res.json({"error": "Verification failed"}, 403)
 
         # POST - Messaggio in arrivo
-        if req.get('method') == "POST":
+        if req.method == "POST":
             entry = body.get("entry", [])[0]
             changes = entry.get("changes", [])[0]
             value = changes.get("value", {})
             messages = value.get("messages", [])
             
             if not messages:
-                return {"body": "No message to process."}
+                return res.send("No message to process.")
 
             message = messages[0]
             sender_id = message["from"]
@@ -61,7 +61,7 @@ def main(req):
 
             if not user_id:
                 print("Errore: impossibile ottenere l'ID dell'utente Instagram.")
-                return {"status": "error", "message": "Instagram ID not found"}
+                return res.json({"error": "Instagram ID not found"}, 500)
 
             message_url = f"https://graph.instagram.com/v18.0/{user_id}/messages"
             payload = {
@@ -73,10 +73,10 @@ def main(req):
             r = requests.post(message_url, headers=headers, json=payload, params={"access_token": instagram_token})
 
             print(f"Risposta inviata: {r.status_code} - {r.text}")
-            return {"status": "ok", "message": "OK"}
+            return res.send("OK")
 
-        return {"status": "error", "message": "Unsupported method"}
+        return res.send("Unsupported method", 405)
 
     except Exception as e:
         print("Errore:", str(e))
-        return {"status": "error", "message": str(e)}
+        return res.json({"error": str(e)}, 500)
