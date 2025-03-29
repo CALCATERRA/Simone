@@ -8,7 +8,7 @@ def main(context):
         context.log("Funzione avviata")
 
         # Legge il prompt dal file
-        with open("prompt.txt", "r") as f:
+        with open(os.path.join(os.path.dirname(__file__), "prompt.txt"), "r") as f:
             prompt_prefix = f.read()
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
