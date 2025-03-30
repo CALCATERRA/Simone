@@ -90,7 +90,10 @@ def main(context):
             messages=[{"role": "system", "content": prompt_prefix}] + chat_history
         )
 
+        # Prendi solo la prima risposta generata
         reply_text = ai_response.choices[0].message.content.strip()
+
+        # Log della risposta generata
         context.log(f"Risposta generata: {reply_text}")
 
         # Invia la risposta all'utente su Instagram
@@ -113,3 +116,4 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
