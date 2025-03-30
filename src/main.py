@@ -71,12 +71,12 @@ def main(context):
             context.log(f"Messaggio con ID {message_id} già elaborato. Nessuna risposta inviata.")
             return context.res.send("Messaggio già elaborato.")
 
-        # Aggiungi l'ID del messaggio all'elenco dei processati
+        # Aggiunge l'ID del messaggio all'elenco dei processati
         processed_message_ids.append(message_id)
 
-        # Costruisce il contesto conversazionale
+        # Costruisce il contesto conversazionale (ultimi 15 messaggi max)
         chat_history = []
-        for msg in sorted_messages:
+        for msg in sorted_messages[-15:]:
             role = "user" if msg["from"]["id"] != page_id else "assistant"
             chat_history.append({
                 "role": role,
@@ -90,10 +90,15 @@ def main(context):
             messages=[{"role": "system", "content": prompt_prefix}] + chat_history
         )
 
-        # Prendi solo la prima risposta generata
-        reply_text = ai_response.choices[0].message.content.strip()
+        # Estrai e compatta la risposta (rimuove \n)
+        raw_reply = ai_response.choices[0].message.content.strip()
+        reply_text = " ".join(raw_reply.splitlines()).strip()
 
-        # Log della risposta generata
+        # Limita la risposta a 30 parole
+        words = reply_text.split()
+        if len(words) > 30:
+            reply_text = " ".join(words[:30]) + "..."
+
         context.log(f"Risposta generata: {reply_text}")
 
         # Invia la risposta all'utente su Instagram
@@ -108,7 +113,7 @@ def main(context):
         send_res = requests.post(send_url, headers=send_headers, json=send_payload, params=send_params)
         context.log(f"Risposta inviata: {send_res.status_code} - {send_res.text}")
 
-        # Aggiungi un breve ritardo per evitare troppi messaggi simultanei
+        # Ritardo minimo per evitare risposte duplicate
         time.sleep(2)
 
         return context.res.send("OK")
@@ -116,4 +121,5 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
 
