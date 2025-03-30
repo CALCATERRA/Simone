@@ -2,9 +2,7 @@ import os
 import json
 import requests
 from openai import OpenAI
-
-# Lista temporanea per gli ID dei messaggi già elaborati
-processed_message_ids = []
+from datetime import datetime, timedelta
 
 def main(context):
     try:
@@ -51,27 +49,27 @@ def main(context):
             context.error("Impossibile ottenere l'ID della pagina.")
             return context.res.send("Errore nel recupero dell'ID pagina.")
 
-        # Ordina i messaggi per data
+        # Ordina i messaggi per data (dal più vecchio al più recente)
         sorted_messages = sorted(messages, key=lambda m: m["created_time"])
-
-        # Ultimo messaggio ricevuto
         last_msg = sorted_messages[-1]
+
+        # Se l'ultimo messaggio è del bot, ignoriamo
+        if last_msg["from"]["id"] == page_id:
+            context.log("Ultimo messaggio è stato inviato dal bot. Ignoro per evitare loop.")
+            return context.res.send("Ultimo messaggio è del bot, non rispondo.")
+
+        # Controlla se il bot ha risposto recentemente (entro 60 secondi)
+        last_bot_msg = next((m for m in reversed(sorted_messages) if m["from"]["id"] == page_id), None)
+        if last_bot_msg:
+            bot_time = datetime.strptime(last_bot_msg["created_time"], "%Y-%m-%dT%H:%M:%S%z")
+            now = datetime.now(bot_time.tzinfo)
+            if now - bot_time < timedelta(seconds=60):
+                context.log("Il bot ha già risposto di recente. Ignoro per evitare spam.")
+                return context.res.send("Risposta recente già inviata.")
+
         message_id = last_msg["id"]
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
-
-        # Ignora i messaggi della pagina stessa
-        if user_id == page_id:
-            context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
-            return context.res.send("Messaggio interno ignorato.")
-
-        # Evita di rispondere due volte allo stesso messaggio
-        if message_id in processed_message_ids:
-            context.log(f"Messaggio con ID {message_id} già elaborato. Nessuna risposta inviata.")
-            return context.res.send("Messaggio già elaborato.")
-
-        # Aggiunge il messaggio all'elenco dei processati
-        processed_message_ids.append(message_id)
 
         # Costruisce il contesto conversazionale
         chat_history = []
@@ -82,11 +80,15 @@ def main(context):
                 "content": msg["message"]
             })
 
+        # Mantiene solo gli ultimi 15 messaggi
+        chat_history = chat_history[-15:]
+
         # Chiamata a OpenAI
         client = OpenAI(api_key=openai_api_key)
         ai_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": prompt_prefix}] + chat_history
+            messages=[{"role": "system", "content": prompt_prefix}] + chat_history,
+            max_tokens=300
         )
 
         reply_text = ai_response.choices[0].message.content.strip()
@@ -109,4 +111,5 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
 
