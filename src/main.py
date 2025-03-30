@@ -3,6 +3,9 @@ import json
 import requests
 from openai import OpenAI
 
+# Lista temporanea per gli ID dei messaggi già elaborati
+processed_message_ids = []
+
 def main(context):
     try:
         context.log("Funzione avviata")
@@ -35,11 +38,20 @@ def main(context):
             return context.res.send("Nessun messaggio utile.")
 
         # Trova l'ultimo messaggio ricevuto
-        last_msg = messages[-1]  # <-- prende l'ultimo messaggio
+        last_msg = messages[-1]
+        message_id = last_msg["id"]  # <-- ID del messaggio
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
 
         context.log(f"Messaggio ricevuto da {user_id}: {user_text}")
+
+        # Verifica se il messaggio è già stato elaborato
+        if message_id in processed_message_ids:
+            context.log(f"Messaggio con ID {message_id} già elaborato. Nessuna risposta inviata.")
+            return context.res.send("Messaggio già elaborato.")
+        
+        # Aggiungi il messaggio alla lista dei processati
+        processed_message_ids.append(message_id)
 
         # Costruisce il prompt completo
         prompt = f"{prompt_prefix}\n\nUtente: {user_text}\nAssistente:"
