@@ -2,10 +2,8 @@ import os
 import json
 import requests
 import time
+from datetime import datetime, timezone
 from openai import OpenAI
-
-# Lista temporanea per gli ID dei messaggi già elaborati
-processed_message_ids = []
 
 def main(context):
     try:
@@ -66,15 +64,14 @@ def main(context):
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Controlla se il messaggio è già stato elaborato
-        if message_id in processed_message_ids:
-            context.log(f"Messaggio con ID {message_id} già elaborato. Nessuna risposta inviata.")
-            return context.res.send("Messaggio già elaborato.")
+        # Controllo temporale: ignora messaggi troppo recenti
+        msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        if (now - msg_time).total_seconds() < 5:
+            context.log("Messaggio troppo recente, potenziale duplicato. Ignorato.")
+            return context.res.send("Messaggio ignorato per evitare duplicati.")
 
-        # Aggiunge l'ID del messaggio all'elenco dei processati
-        processed_message_ids.append(message_id)
-
-        # Costruisce il contesto conversazionale (ultimi 15 messaggi max)
+        # Costruisce il contesto conversazionale (ultimi 15 messaggi)
         chat_history = []
         for msg in sorted_messages[-15:]:
             role = "user" if msg["from"]["id"] != page_id else "assistant"
@@ -113,13 +110,8 @@ def main(context):
         send_res = requests.post(send_url, headers=send_headers, json=send_payload, params=send_params)
         context.log(f"Risposta inviata: {send_res.status_code} - {send_res.text}")
 
-        # Ritardo minimo per evitare risposte duplicate
-        time.sleep(2)
-
         return context.res.send("OK")
 
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
-
-
