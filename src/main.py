@@ -37,25 +37,11 @@ def main(context):
             context.log("Nessun messaggio nella conversazione.")
             return context.res.send("Nessun messaggio utile.")
 
-        # Recupera l'ID della pagina per evitare loop
-        page_info_url = "https://graph.instagram.com/me"
-        page_info_params = {
-            "fields": "id",
-            "access_token": instagram_token
-        }
-        page_info_res = requests.get(page_info_url, params=page_info_params)
-        page_info = page_info_res.json()
-        page_id = page_info.get("id")
-
-        if not page_id:
-            context.error("Impossibile ottenere l'ID della pagina.")
-            return context.res.send("Errore nel recupero dell'ID pagina.")
-
         # Trova l'ultimo messaggio dell'utente (NON della pagina)
         last_user_msg = None
         for msg in messages:
             sender_id = msg["from"]["id"]
-            if sender_id != page_id:
+            if sender_id != page_id:  # Assicurati che la variabile page_id sia inizializzata correttamente
                 last_user_msg = msg
                 break
 
@@ -69,6 +55,21 @@ def main(context):
 
         context.log(f"Ultimo messaggio utente ricevuto da {user_id}: {user_text}")
 
+        # Recupera l'ID della pagina per evitare loop
+        page_info_url = "https://graph.instagram.com/me"
+        page_info_params = {
+            "fields": "id",
+            "access_token": instagram_token
+        }
+        page_info_res = requests.get(page_info_url, params=page_info_params)
+        page_info = page_info_res.json()
+
+        page_id = page_info.get("id")
+
+        if not page_id:
+            context.error("Impossibile ottenere l'ID della pagina.")
+            return context.res.send("Errore nel recupero dell'ID pagina.")
+
         # Evita di rispondere a se stesso
         if user_id == page_id:
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
@@ -79,6 +80,7 @@ def main(context):
             context.log(f"Messaggio con ID {message_id} già elaborato. Nessuna risposta inviata.")
             return context.res.send("Messaggio già elaborato.")
 
+        # Aggiungi il messaggio alla lista dei processati
         processed_message_ids.append(message_id)
 
         # Costruisce il prompt completo
