@@ -37,14 +37,6 @@ def main(context):
             context.log("Nessun messaggio nella conversazione.")
             return context.res.send("Nessun messaggio utile.")
 
-        # Trova l'ultimo messaggio ricevuto
-        last_msg = messages[0]
-        message_id = last_msg["id"]
-        user_id = last_msg["from"]["id"]
-        user_text = last_msg["message"]
-
-        context.log(f"Messaggio ricevuto da {user_id}: {user_text}")
-
         # Recupera l'ID della pagina per evitare loop
         page_info_url = "https://graph.instagram.com/me"
         page_info_params = {
@@ -59,29 +51,42 @@ def main(context):
             context.error("Impossibile ottenere l'ID della pagina.")
             return context.res.send("Errore nel recupero dell'ID pagina.")
 
-        # Evita di rispondere a se stesso
+        # Ordina i messaggi per data
+        sorted_messages = sorted(messages, key=lambda m: m["created_time"])
+
+        # Ultimo messaggio ricevuto
+        last_msg = sorted_messages[-1]
+        message_id = last_msg["id"]
+        user_id = last_msg["from"]["id"]
+        user_text = last_msg["message"]
+
+        # Ignora i messaggi della pagina stessa
         if user_id == page_id:
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Verifica se il messaggio è già stato elaborato
+        # Evita di rispondere due volte allo stesso messaggio
         if message_id in processed_message_ids:
             context.log(f"Messaggio con ID {message_id} già elaborato. Nessuna risposta inviata.")
             return context.res.send("Messaggio già elaborato.")
 
+        # Aggiunge il messaggio all'elenco dei processati
         processed_message_ids.append(message_id)
 
-        # Costruisce il prompt completo
-        prompt = f"{prompt_prefix}\n\nUtente: {user_text}\nAssistente:"
+        # Costruisce il contesto conversazionale
+        chat_history = []
+        for msg in sorted_messages:
+            role = "user" if msg["from"]["id"] != page_id else "assistant"
+            chat_history.append({
+                "role": role,
+                "content": msg["message"]
+            })
 
-        # Chiamata a OpenAI con nuova sintassi
+        # Chiamata a OpenAI
         client = OpenAI(api_key=openai_api_key)
         ai_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": prompt_prefix},
-                {"role": "user", "content": user_text}
-            ]
+            messages=[{"role": "system", "content": prompt_prefix}] + chat_history
         )
 
         reply_text = ai_response.choices[0].message.content.strip()
