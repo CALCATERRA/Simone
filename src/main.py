@@ -55,7 +55,6 @@ def main(context):
 
        context.log(f"Ultimo messaggio utente ricevuto da {user_id}: {user_text}")
 
-        context.log(f"Messaggio ricevuto da {user_id}: {user_text}")
 
         # Recupera l'ID della pagina per evitare loop
         page_info_url = "https://graph.instagram.com/me"
