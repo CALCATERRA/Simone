@@ -37,23 +37,23 @@ def main(context):
             context.log("Nessun messaggio nella conversazione.")
             return context.res.send("Nessun messaggio utile.")
 
-       # Trova l'ultimo messaggio dell'utente (NON della pagina)
-       last_user_msg = None
-       for msg in messages:
-           sender_id = msg["from"]["id"]
-           if sender_id != page_id:
-               last_user_msg = msg
-               break
+# Trova l'ultimo messaggio dell'utente (NON della pagina)
+last_user_msg = None
+for msg in messages:
+    sender_id = msg["from"]["id"]
+    if sender_id != page_id:
+        last_user_msg = msg
+        break
 
-       if not last_user_msg:
-           context.log("Nessun messaggio valido da utente trovato.")
-           return context.res.send("Nessun nuovo messaggio utente.")
+if not last_user_msg:
+    context.log("Nessun messaggio valido da utente trovato.")
+    return context.res.send("Nessun nuovo messaggio utente.")
 
-       message_id = last_user_msg["id"]
-       user_id = last_user_msg["from"]["id"]
-       user_text = last_user_msg["message"]
+message_id = last_user_msg["id"]
+user_id = last_user_msg["from"]["id"]
+user_text = last_user_msg["message"]
 
-       context.log(f"Ultimo messaggio utente ricevuto da {user_id}: {user_text}")
+context.log(f"Ultimo messaggio utente ricevuto da {user_id}: {user_text}")
 
 
         # Recupera l'ID della pagina per evitare loop
