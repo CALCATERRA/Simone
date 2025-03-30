@@ -38,7 +38,7 @@ def main(context):
             return context.res.send("Nessun messaggio utile.")
 
         # Trova l'ultimo messaggio ricevuto
-        last_msg = messages[-1]
+        last_msg = messages[0]
         message_id = last_msg["id"]  # <-- ID del messaggio
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
