@@ -1,4 +1,5 @@
-import base64
+{
+    "system_instruction": import base64
 import os
 from google import genai
 from google.genai import types
@@ -214,3 +215,4 @@ Haha, dai!😄
 
 if __name__ == "__main__":
     generate()
+}
