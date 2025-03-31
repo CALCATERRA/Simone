@@ -15,7 +15,7 @@ def main(context):
         gemini_api_key = os.environ["GEMINI_API_KEY"]
 
         genai.configure(api_key=gemini_api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
+        model = genai.GenerativeModel("gemini-1.5-flash")
 
         # Ottieni i messaggi più recenti
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
