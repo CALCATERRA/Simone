@@ -3,7 +3,7 @@ import json
 import requests
 import time
 from datetime import datetime, timezone
-from openai import OpenAI
+import google.generativeai as genai
 
 def main(context):
     try:
@@ -14,14 +14,15 @@ def main(context):
             prompt_prefix = f.read()
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
-        openai_api_key = os.environ["OPENAI_API_KEY"]
+        gemini_api_key = os.environ["GEMINI_API_KEY"]
+
+        # Configura l'API Gemini
+        genai.configure(api_key=gemini_api_key)
+        model = genai.GenerativeModel("gemini-pro")
 
         # Recupera le conversazioni recenti da Instagram
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
-        convo_params = {
-            "fields": "messages{message,from,id,created_time}",
-            "access_token": instagram_token
-        }
+        convo_params = {"fields": "messages{message,from,id,created_time}", "access_token": instagram_token}
         convo_res = requests.get(convo_url, params=convo_params)
         convo_data = convo_res.json()
 
@@ -38,10 +39,7 @@ def main(context):
 
         # Recupera l'ID della pagina per evitare loop
         page_info_url = "https://graph.instagram.com/me"
-        page_info_params = {
-            "fields": "id",
-            "access_token": instagram_token
-        }
+        page_info_params = {"fields": "id", "access_token": instagram_token}
         page_info_res = requests.get(page_info_url, params=page_info_params)
         page_info = page_info_res.json()
         page_id = page_info.get("id")
@@ -52,8 +50,6 @@ def main(context):
 
         # Ordina i messaggi per data
         sorted_messages = sorted(messages, key=lambda m: m["created_time"])
-
-        # Ultimo messaggio ricevuto
         last_msg = sorted_messages[-1]
         message_id = last_msg["id"]
         user_id = last_msg["from"]["id"]
@@ -75,20 +71,14 @@ def main(context):
         chat_history = []
         for msg in sorted_messages[-15:]:
             role = "user" if msg["from"]["id"] != page_id else "assistant"
-            chat_history.append({
-                "role": role,
-                "content": msg["message"]
-            })
+            chat_history.append({"role": role, "content": msg["message"]})
 
-        # Chiamata a OpenAI
-        client = OpenAI(api_key=openai_api_key)
-        ai_response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": prompt_prefix}] + chat_history
-        )
-
-        # Estrai e compatta la risposta (rimuove \n)
-        raw_reply = ai_response.choices[0].message.content.strip()
+        # Chiamata a Gemini per generare la risposta
+        response = model.generate_content([
+            {"role": "system", "content": prompt_prefix}
+        ] + chat_history)
+        
+        raw_reply = response.text.strip()
         reply_text = " ".join(raw_reply.splitlines()).strip()
 
         # Limita la risposta a 30 parole
@@ -100,10 +90,7 @@ def main(context):
 
         # Invia la risposta all'utente su Instagram
         send_url = "https://graph.instagram.com/v18.0/me/messages"
-        send_payload = {
-            "recipient": {"id": user_id},
-            "message": {"text": reply_text}
-        }
+        send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
         send_headers = {"Content-Type": "application/json"}
         send_params = {"access_token": instagram_token}
 
