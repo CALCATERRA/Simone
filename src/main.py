@@ -80,6 +80,10 @@ def main(context):
 
             reply_text = response.text.strip()
 
+            # Rimuove il prefisso "Simone:" dalla risposta, se presente
+            if reply_text.startswith("Simone:"):
+                reply_text = reply_text[7:].strip()  # Rimuove "Simone:" e gli spazi
+
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘!"
@@ -102,4 +106,3 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
-
