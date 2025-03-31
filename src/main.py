@@ -74,11 +74,11 @@ def main(context):
                 raw_reply = response.candidates[0].content.strip()
             else:
                 context.error(f"Nessun testo generato. Risultato: {response}")
-                raw_reply = "Non ho capito, puoi riformulare? 😊"
+                raw_reply = "😘!"
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "Non ho capito, puoi riformulare? 😊"
+            raw_reply = "😘"
 
         # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
