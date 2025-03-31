@@ -71,7 +71,7 @@ def main(context):
 
         # Chiamata a Gemini per generare la risposta
         try:
-            response = model.generate_content([{"text": prompt_prefix}] + chat_history)
+            response = model.generate_content([{"text": prompt_prefix}] + chat_history, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
             raw_reply = response.text.strip() if response and hasattr(response, 'text') else ""
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
