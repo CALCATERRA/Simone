@@ -4,14 +4,14 @@ import requests
 import time
 from datetime import datetime, timezone
 import google.generativeai as genai
+from prompt import PROMPT_PERSONAGGIO  # Importa il prompt dal file prompt.py
 
 def main(context):
     try:
         context.log("Funzione avviata")
 
-        # Legge il prompt dal file
-        with open(os.path.join(os.path.dirname(__file__), "prompt.txt"), "r") as f:
-            prompt_prefix = f.read()
+        # Usa il prompt definito in prompt.py
+        prompt_prefix = PROMPT_PERSONAGGIO
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
         gemini_api_key = os.environ["GEMINI_API_KEY"]
