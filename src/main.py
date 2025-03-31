@@ -69,7 +69,7 @@ def main(context):
                     "temperature": 0.8,
                     "top_k": 20,
                     "top_p": 0.9,
-                    "max_output_tokens": 128
+                    "max_output_tokens": 512
                 }
             )
 
