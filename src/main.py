@@ -2,7 +2,6 @@ import os
 import json
 import requests
 import google.generativeai as genai
-from google.generativeai import types
 
 def main(context):
     try:
@@ -54,33 +53,25 @@ def main(context):
         if user_id == page_id:
             return context.res.send("Messaggio interno ignorato.")
 
-        # Prepara il contenuto per Gemini
-        contents = [
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=user_text)]
-            )
-        ]
-        generate_content_config = types.GenerateContentConfig(
-            response_mime_type="text/plain",
-            system_instruction=[types.Part.from_text(text=prompt_data["system_instruction"])],
-            temperature=0.7,
-            max_output_tokens=100,
-            top_k=1
-        )
+        # Prepara il contenuto per Gemini (ora inviamo il testo direttamente)
+        user_message = user_text.strip()
 
         # Genera risposta con Gemini
         try:
-            chunks = genai.models.generate_content_stream(
+            # Chiamata all'API di Gemini per generare la risposta
+            response = genai.chat(
                 model=model,
-                contents=contents,
-                config=generate_content_config
+                messages=[{
+                    "role": "user",
+                    "content": user_message
+                }],
+                system_instruction=prompt_data["system_instruction"],
+                temperature=0.7,
+                max_output_tokens=100,
+                top_k=1
             )
 
-            full_text = ""
-            for chunk in chunks:
-                if chunk.text:
-                    full_text += chunk.text
+            full_text = response.get("text", "")
 
             # Funzione per deduplicare frasi troppo simili
             def dedup_responses(text):
@@ -130,3 +121,4 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
