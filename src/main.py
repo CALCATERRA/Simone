@@ -77,11 +77,11 @@ def main(context):
                 raw_reply = response.candidates[0].get('text', 'Risposta mancante').strip()
             else:
                 context.error(f"Nessun candidato generato dalla risposta di Gemini. Risposta completa: {response}")
-                raw_reply = "Mi dispiace, non sono riuscito a generare una risposta al momento."
+                raw_reply = "😘!"
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "Mi dispiace, non sono riuscito a generare una risposta al momento."
+            raw_reply = "😘!"
 
         # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
