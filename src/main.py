@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import time
 from datetime import datetime, timezone
 import google.generativeai as genai
 
@@ -15,6 +16,7 @@ def main(context):
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
         gemini_api_key = os.environ["GEMINI_API_KEY"]
 
+        # Configura Gemini
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
 
@@ -32,9 +34,10 @@ def main(context):
         if not messages:
             return context.res.send("Nessun messaggio utile.")
 
-        # Evita loop
+        # Evita loop rispondendo a sé stesso
         page_info_url = "https://graph.instagram.com/me"
-        page_id = requests.get(page_info_url, params={"fields": "id", "access_token": instagram_token}).json().get("id")
+        page_info_params = {"fields": "id", "access_token": instagram_token}
+        page_id = requests.get(page_info_url, params=page_info_params).json().get("id")
         if not page_id:
             return context.res.send("Errore nel recupero ID pagina.")
 
@@ -46,38 +49,36 @@ def main(context):
         if user_id == page_id:
             return context.res.send("Messaggio interno ignorato.")
 
+        # Ignora messaggi troppo recenti
         msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Prepara la lista di messaggi in formato semplice
-        history = []
-
-        for ex in prompt_data.get("examples", []):
-            history.append({"role": "user", "parts": [ex["input"]]})
-            history.append({"role": "model", "parts": [ex["output"]]})
-
-        # Aggiungi il messaggio reale ricevuto
-        history.append({"role": "user", "parts": [user_text]})
+        # Costruisce il prompt da system_instruction + ultimi messaggi
+        prompt_parts = [{"text": prompt_data["system_instruction"]}]
+        prompt_parts += [{"text": m["message"]} for m in sorted_messages[-10:]]
 
         # Chiamata a Gemini
         try:
-response = model.generate_content(
-    [{"text": prompt_data["system_instruction"]}] + [{"text": m["message"]} for m in sorted_messages[-10:]],
-    generation_config={
-        "temperature": 0.7,
-        "max_output_tokens": 5000,
-        "top_k": 1
-    }
-)
+            response = model.generate_content(
+                prompt_parts,
+                generation_config={
+                    "temperature": 0.7,
+                    "max_output_tokens": 5024,
+                    "top_k": 1
+                }
+            )
+
+            if not response.candidates or not response.text:
+                raise ValueError("Gemini non ha generato risposte.")
 
             reply_text = response.text.strip()
 
         except Exception as e:
-            context.error(f"Errore Gemini: {str(e)}")
+            context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘!"
 
-        # Taglia risposta se troppo lunga
+        # Limita a 30 parole
         words = reply_text.split()
         if len(words) > 15:
             reply_text = " ".join(words[:30]) + "..."
@@ -93,5 +94,5 @@ response = model.generate_content(
         return context.res.send("OK")
 
     except Exception as e:
-        context.error(f"Errore globale: {str(e)}")
+        context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
