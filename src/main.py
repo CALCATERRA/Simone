@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+from datetime import datetime, timezone
 import google.generativeai as genai
 
 def main(context):
@@ -9,7 +10,7 @@ def main(context):
 
         # Legge il prompt dal file
         with open(os.path.join(os.path.dirname(__file__), "prompt.txt"), "r") as f:
-            prompt_prefix = f.read()
+            prompt_prefix = f.read().strip()
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
         gemini_api_key = os.environ["GEMINI_API_KEY"]
@@ -58,22 +59,24 @@ def main(context):
             return context.res.send("Messaggio interno ignorato.")
 
         # Costruisce il contesto conversazionale (ultimi 10 messaggi per ridurre i token)
-        chat_history = [msg["message"] for msg in sorted_messages[-10:]]
-        
-        # Prepara il prompt
-        prompt_input = prompt_prefix + "\n" + "\n".join(chat_history)
+        chat_history = [{"text": msg["message"]} for msg in sorted_messages[-10:]]
 
         # Chiamata a Gemini per generare la risposta
         try:
+            # Combina il prompt con la cronologia dei messaggi
+            prompt_input = [{"text": prompt_prefix}] + chat_history
             response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 50, "top_k": 1})
+
+            # Log della risposta completa
             context.log(f"Risposta completa di Gemini: {response}")
-            
-            # Estrai la risposta corretta
-            if response and hasattr(response, 'text'):
+
+            # Verifica che la risposta abbia parti valide
+            if response and hasattr(response, "text") and response.text.strip():
                 raw_reply = response.text.strip()
             else:
-                context.error("Nessun testo generato da Gemini.")
+                context.error(f"Nessun testo generato. Risultato: {response}")
                 raw_reply = "😘!"
+
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             raw_reply = "😘"
@@ -100,3 +103,4 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
