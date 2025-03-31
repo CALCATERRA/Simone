@@ -2,4 +2,4 @@ appwrite
 openai
 requests
 python-dotenv
-
+google-generativeai
