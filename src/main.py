@@ -20,7 +20,7 @@ def main(context):
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
 
-        # Ottiene i messaggi recenti da Instagram
+        # Recupera i messaggi recenti
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
         convo_params = {"fields": "messages{message,from,id,created_time}", "access_token": instagram_token}
         convo_res = requests.get(convo_url, params=convo_params)
@@ -31,39 +31,34 @@ def main(context):
 
         last_convo = convo_data["data"][0]
         messages = last_convo.get("messages", {}).get("data", [])
-
         if not messages:
             return context.res.send("Nessun messaggio utile.")
 
-        # Recupera l'ID della pagina per evitare loop
+        # Evita loop rispondendo a sé stesso
         page_info_url = "https://graph.instagram.com/me"
         page_info_params = {"fields": "id", "access_token": instagram_token}
-        page_info_res = requests.get(page_info_url, params=page_info_params)
-        page_id = page_info_res.json().get("id")
-
+        page_id = requests.get(page_info_url, params=page_info_params).json().get("id")
         if not page_id:
-            return context.res.send("Errore nel recupero dell'ID pagina.")
+            return context.res.send("Errore nel recupero ID pagina.")
 
-        # Ordina i messaggi e prendi l'ultimo
         sorted_messages = sorted(messages, key=lambda m: m["created_time"])
         last_msg = sorted_messages[-1]
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
 
-        # Ignora i messaggi della pagina stessa
         if user_id == page_id:
             return context.res.send("Messaggio interno ignorato.")
 
-        # Ignora messaggi troppo recenti (evita doppie risposte)
+        # Ignora messaggi troppo recenti
         msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Costruisce il contesto: prompt di sistema + ultimi 10 messaggi
+        # Costruisce il prompt da system_instruction + ultimi messaggi
         prompt_parts = [{"text": prompt_data["system_instruction"]}]
         prompt_parts += [{"text": m["message"]} for m in sorted_messages[-10:]]
 
-        # Genera la risposta
+        # Chiamata a Gemini
         try:
             response = model.generate_content(
                 prompt_parts,
@@ -74,22 +69,21 @@ def main(context):
                 }
             )
 
-            if not response.candidates:
-                raise ValueError("Nessuna risposta generata.")
+            if not response.candidates or not response.text:
+                raise ValueError("Gemini non ha generato risposte.")
 
             reply_text = response.text.strip()
-            context.log(f"Risposta generata: {reply_text}")
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘!"
 
-        # Taglia la risposta se troppo lunga
+        # Limita a 30 parole
         words = reply_text.split()
         if len(words) > 30:
             reply_text = " ".join(words[:30]) + "..."
 
-        # Invia la risposta su Instagram
+        # Invia la risposta
         send_url = "https://graph.instagram.com/v18.0/me/messages"
         send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
         send_headers = {"Content-Type": "application/json"}
