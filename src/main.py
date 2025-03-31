@@ -62,16 +62,14 @@ def main(context):
 
         # Chiamata a Gemini
         try:
-            response = model.generate_content(
-                history,
-                system_instruction=prompt_data["system_instruction"],
-                generation_config={
-                    "temperature": 0.8,
-                    "top_k": 20,
-                    "top_p": 0.9,
-                    "max_output_tokens": 5120
-                }
-            )
+response = model.generate_content(
+    [{"text": prompt_data["system_instruction"]}] + [{"text": m["message"]} for m in sorted_messages[-10:]],
+    generation_config={
+        "temperature": 0.7,
+        "max_output_tokens": 5000,
+        "top_k": 1
+    }
+)
 
             reply_text = response.text.strip()
 
