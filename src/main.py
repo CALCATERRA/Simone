@@ -59,10 +59,10 @@ def main(context):
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Controllo temporale: ignora messaggi troppo recenti
+        # Controllo temporale: ignora messaggi troppo recenti (modificato a 60 secondi)
         msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
-        if (now - msg_time).total_seconds() < 5:
+        if (now - msg_time).total_seconds() < 60:  # Cambiato a 60 secondi
             context.log("Messaggio troppo recente, potenziale duplicato. Ignorato.")
             return context.res.send("Messaggio ignorato per evitare duplicati.")
 
@@ -71,12 +71,22 @@ def main(context):
 
         # Chiamata a Gemini per generare la risposta
         try:
-            response = model.generate_content([{"text": prompt_prefix}] + chat_history, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
-            raw_reply = response.text.strip() if response and hasattr(response, 'text') else ""
+            # Combina il prompt dal file con la cronologia dei messaggi
+            prompt_input = [{"text": prompt_prefix}] + chat_history
+
+            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
+            
+            # Verifica se la risposta contiene candidati
+            if response and hasattr(response, 'candidates') and len(response.candidates) > 0:
+                raw_reply = response.candidates[0].text.strip()  # Usa il primo candidato della risposta
+            else:
+                context.error("Nessun candidato generato dalla risposta di Gemini.")
+                raw_reply = "😘!"  # Risposta di fallback in caso di errore
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "😘!"
+            raw_reply = "😘!"  # Risposta di fallback in caso di errore
 
+        # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
         words = reply_text.split()
         if len(words) > 30:
