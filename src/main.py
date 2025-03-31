@@ -1,9 +1,15 @@
+import sys
 import os
 import json
 import requests
 import time
 from datetime import datetime, timezone
 import google.generativeai as genai
+
+# Aggiungi la cartella corrente al percorso di ricerca dei moduli
+sys.path.append(os.getcwd())
+
+# Importa la funzione 'generate' dal tuo prompt.py
 from prompt import generate  # Usa la funzione generate dal tuo prompt.py
 
 def main(context):
