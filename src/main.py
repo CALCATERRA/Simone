@@ -68,7 +68,7 @@ def main(context):
 
         # Costruisce il contesto conversazionale (ultimi 15 messaggi)
         chat_history = [
-            {"role": "user" if msg["from"]["id"] != page_id else "assistant", "content": msg["message"]}
+            {"role": "user" if msg["from"]["id"] != page_id else "assistant", "text": msg["message"]}
             for msg in sorted_messages[-15:]
         ]
 
@@ -78,9 +78,9 @@ def main(context):
                 "parts": [
                     {
                         "role": "system",
-                        "content": prompt_prefix
+                        "text": prompt_prefix
                     }
-                ] + [{"role": "user", "content": msg["message"]} for msg in sorted_messages[-15:]]
+                ] + [{"role": "user", "text": msg["message"]} for msg in sorted_messages[-15:]]
             })
             raw_reply = response.text.strip() if response and hasattr(response, 'text') else ""
         except Exception as e:
