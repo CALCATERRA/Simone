@@ -4,6 +4,7 @@ import requests
 import time
 from datetime import datetime, timezone
 import google.generativeai as genai
+from google.generativeai.types import Content, Part
 
 def main(context):
     try:
@@ -54,23 +55,35 @@ def main(context):
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Costruisce il prompt da system_instruction + ultimi messaggi
-        prompt_parts = [{"text": prompt_data["system_instruction"]}]
-        prompt_parts += [{"text": m["message"]} for m in sorted_messages[-10:]]
+        # Costruisce i messaggi da passare a Gemini
+        history = []
 
-        # Chiamata a Gemini
-        try:
-            response = model.generate_content(
-                prompt_parts,
-                generation_config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 10240,
-                    "top_k": 1
-                }
+        # Aggiungi esempi da prompt.json
+        for ex in prompt_data.get("examples", []):
+            history.append(
+                Content(parts=[Part(text=ex["input"])], role="user")
+            )
+            history.append(
+                Content(parts=[Part(text=ex["output"])], role="model")
             )
 
-            if not response.candidates or not response.text:
-                raise ValueError("Gemini non ha generato risposte.")
+        # Aggiungi gli ultimi messaggi veri
+        for m in sorted_messages[-10:]:
+            role = "user" if m["from"]["id"] != page_id else "model"
+            history.append(Content(parts=[Part(text=m["message"])], role=role))
+
+        # Genera risposta con Gemini
+        try:
+            response = model.generate_content(
+                history,
+                generation_config={
+                    "temperature": 0.8,
+                    "top_k": 20,
+                    "top_p": 0.9,
+                    "max_output_tokens": 128
+                },
+                system_instruction=prompt_data["system_instruction"]
+            )
 
             reply_text = response.text.strip()
 
@@ -78,9 +91,9 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘!"
 
-        # Limita a 30 parole
+        # Limita la lunghezza
         words = reply_text.split()
-        if len(words) > 15:
+        if len(words) > 30:
             reply_text = " ".join(words[:30]) + "..."
 
         # Invia la risposta
@@ -96,3 +109,4 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
