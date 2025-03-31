@@ -59,10 +59,10 @@ def main(context):
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Controllo temporale: ignora messaggi troppo recenti
+        # Controllo temporale: ignora messaggi troppo recenti (30 secondi)
         msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
-        if (now - msg_time).total_seconds() < 5:
+        if (now - msg_time).total_seconds() < 30:  # Aumentato da 5 a 30 secondi
             context.log("Messaggio troppo recente, potenziale duplicato. Ignorato.")
             return context.res.send("Messaggio ignorato per evitare duplicati.")
 
