@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import google.generativeai as genai
+import difflib
 
 def main(context):
     try:
@@ -68,20 +69,35 @@ def main(context):
                 system_instruction + chat_history,
                 generation_config={
                     "temperature": 0.7,
-                    "max_output_tokens": 100,
-                    "top_k": 1
+                    "max_output_tokens": 200,
+                    "top_k": 1,
+                    "candidate_count": 3  # Richiede più risposte
                 }
             )
-            context.log(f"Risposta grezza di Gemini: {response}")
 
-            # Estrai il testo dalla risposta
-            raw_reply = response.text.strip() if response.text else "😘!"
+            replies = []
+            if hasattr(response, "candidates"):
+                replies = [c.content.parts[0].text.strip() for c in response.candidates if c.content.parts]
+            elif response.text:
+                replies = [response.text.strip()]
+            else:
+                replies = ["😘!"]
+
+            context.log(f"Risposte generate: {replies}")
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "😘!"
+            replies = ["😘!"]
 
-        # Taglia la risposta
+        # Funzione per rimuovere duplicati o risposte simili
+        def remove_similar(responses, similarity_threshold=0.85):
+            unique = []
+            for r in responses:
+                if not any(difflib.SequenceMatcher(None, r.lower(), u.lower()).ratio() > similarity_threshold for u in unique):
+                    unique.append(r)
+            return unique
+
+        # Funzione per tagliare a max 30 parole
         def cut_sentence(text, max_words=30):
             words = text.split()
             if len(words) <= max_words:
@@ -92,12 +108,16 @@ def main(context):
                     return short_text[:short_text.rfind(stop_char) + 1]
             return short_text + "..."
 
-        reply_text = cut_sentence(raw_reply)
-        context.log(f"Risposta generata (corta): {reply_text}")
+        # Pulisce e unisce solo risposte diverse
+        final_replies = remove_similar(replies)
+        combined_reply = " ".join(final_replies)
+        final_text = cut_sentence(combined_reply)
+
+        context.log(f"Risposta finale inviata: {final_text}")
 
         # Invia la risposta all'utente su Instagram
         send_url = "https://graph.instagram.com/v18.0/me/messages"
-        send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
+        send_payload = {"recipient": {"id": user_id}, "message": {"text": final_text}}
         send_headers = {"Content-Type": "application/json"}
         send_params = {"access_token": instagram_token}
 
@@ -109,3 +129,4 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
