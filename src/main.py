@@ -53,15 +53,15 @@ def main(context):
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Costruisce il prompt: system_instruction + cronologia + ultimo messaggio + inizio risposta
+        # Costruisce il prompt: system_instruction + cronologia (solo utente)
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
 
-        # Aggiunge la cronologia (solo messaggi utente precedenti)
+        # Aggiunge solo i messaggi dell'utente (senza "Simone:")
         for m in sorted_messages[-10:]:
             if m["from"]["id"] != page_id:
-                prompt_parts.append({"text": f"User: {m['message']}\nSimone: "})
+                prompt_parts.append({"text": f"User: {m['message']}\n"})
 
-        # Solo l'ultimo messaggio con Simone in attesa di risposta
+        # Solo l'ultimo messaggio dell'utente, per la risposta
         prompt_parts.append({"text": f"User: {user_text}\nSimone: "})
 
         # Chiamata a Gemini
@@ -102,3 +102,4 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
