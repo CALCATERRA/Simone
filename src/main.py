@@ -66,19 +66,16 @@ def main(context):
         try:
             # Combina il prompt dal file con la cronologia dei messaggi
             prompt_input = [{"text": prompt_prefix}] + chat_history
-
-            # Richiede la generazione del contenuto
             response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
-            
-            # Verifica se la risposta contiene candidati validi
+
             if response and hasattr(response, 'candidates') and len(response.candidates) > 0:
-                raw_reply = response.candidates[0].text.strip()  # Usa il primo candidato della risposta
+                raw_reply = response.candidates[0].text.strip()
             else:
-                context.error("Nessun candidato generato dalla risposta di Gemini.")
-                raw_reply = "😘!"  # Risposta di fallback migliorata
+                context.error(f"Nessun candidato generato dalla risposta di Gemini. Risposta completa: {response}")
+                raw_reply = "😘!"
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "😘!"  # Risposta di fallback in caso di errore
+            raw_reply = "😘!"
 
         # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
