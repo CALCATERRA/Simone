@@ -2,7 +2,6 @@ import os
 import json
 import requests
 import google.generativeai as genai
-from google.generativeai import types
 
 def main(context):
     try:
@@ -15,9 +14,9 @@ def main(context):
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
         gemini_api_key = os.environ["GEMINI_API_KEY"]
 
-        # Configura Gemini
+        # Configura Gemini con la chiave API
         genai.configure(api_key=gemini_api_key)
-        client = genai.Client()
+
         model = "gemini-2.0-flash-thinking-exp-01-21"
 
         # Ottieni i messaggi più recenti
@@ -57,30 +56,27 @@ def main(context):
 
         # Prepara il contenuto per Gemini
         contents = [
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=user_text)]
-            )
+            {"role": "user", "content": user_text}
         ]
         
         # Prepara il prompt di sistema
         system_instruction = prompt_data["system_instruction"]
 
-        # Imposta la configurazione per la generazione del contenuto
-        generate_content_config = types.GenerateContentConfig(
-            response_mime_type="text/plain",
-            system_instruction=[types.Part.from_text(text=system_instruction)],
-            temperature=0.7,
-            max_output_tokens=100,
-            top_k=1
-        )
+        # Prepara la configurazione per la generazione del contenuto
+        generate_content_config = {
+            "response_mime_type": "text/plain",
+            "system_instruction": [{"text": system_instruction}],
+            "temperature": 0.7,
+            "max_output_tokens": 100,
+            "top_k": 1
+        }
 
         # Genera risposta con Gemini
         try:
-            # Modifica qui: usa client.chat() se è disponibile
-            response = client.chat(
+            # Usa la funzione chat() per la generazione
+            response = genai.chat(
                 model=model,
-                contents=contents,  # Invia il contenuto, includendo il testo dell'utente
+                messages=contents,  # Invia il contenuto, includendo il testo dell'utente
                 config=generate_content_config
             )
 
