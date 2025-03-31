@@ -1,20 +1,17 @@
-import sys
 import os
 import json
 import requests
 import time
 from datetime import datetime, timezone
 import google.generativeai as genai
-
-# Aggiungi la cartella corrente al percorso di ricerca dei moduli
-sys.path.append(os.getcwd())
-
-# Importa la funzione 'generate' dal tuo prompt.py
-from prompt import generate  # Usa la funzione generate dal tuo prompt.py
+from prompt import PROMPT_PERSONAGGIO  # Importa il prompt dal file prompt.py
 
 def main(context):
     try:
         context.log("Funzione avviata")
+
+        # Usa il prompt definito in prompt.py
+        prompt_prefix = PROMPT_PERSONAGGIO
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
         gemini_api_key = os.environ["GEMINI_API_KEY"]
@@ -72,10 +69,9 @@ def main(context):
         # Costruisce il contesto conversazionale (ultimi 15 messaggi)
         chat_history = [{"text": msg["message"]} for msg in sorted_messages[-15:]]
 
-        # Usa la funzione 'generate' di prompt.py per generare il contenuto personalizzato
+        # Chiamata a Gemini per generare la risposta
         try:
-            # Chiamata al modello Gemini con il contesto e il comportamento di Simone
-            response = generate()  # Qui usiamo la funzione definita in prompt.py
+            response = model.generate_content([{"text": prompt_prefix}] + chat_history, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
             raw_reply = response.text.strip() if response and hasattr(response, 'text') else ""
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
@@ -102,3 +98,4 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
+
