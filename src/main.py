@@ -62,7 +62,7 @@ def main(context):
                 prompt_parts.append({"text": f"User: {m['message']}\n"})
 
         # Solo l'ultimo messaggio dell'utente, per la risposta
-        prompt_parts.append({"text": f"User: {user_text}\nSimone: "})
+        prompt_parts.append({"text": f"User: {user_text}\n"})
 
         # Chiamata a Gemini
         try:
