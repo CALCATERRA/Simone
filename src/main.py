@@ -1,24 +1,25 @@
 import os
 import json
 import requests
-from datetime import datetime, timezone
 import google.generativeai as genai
+from datetime import datetime
+from google.generativeai.types import Content, Part, GenerateContentConfig
 
 def main(context):
     try:
         context.log("Funzione avviata")
-
-        # Legge il prompt dal file
+        
+        # Carica il prompt base
         with open(os.path.join(os.path.dirname(__file__), "prompt.txt"), "r") as f:
-            prompt_prefix = f.read()
-
-        instagram_token = os.environ["INSTAGRAM_TOKEN"]
-        gemini_api_key = os.environ["GEMINI_API_KEY"]
-
-        # Configura l'API Gemini
+            prompt_text = f.read()
+        
+        instagram_token = os.getenv("INSTAGRAM_TOKEN")
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        
+        # Configura Gemini
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
-
+        
         # Recupera le conversazioni recenti da Instagram
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
         convo_params = {"fields": "messages{message,from,id,created_time}", "access_token": instagram_token}
@@ -53,30 +54,37 @@ def main(context):
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
 
-        # Ignora i messaggi della pagina stessa
+        # Ignora i messaggi inviati dalla stessa pagina
         if user_id == page_id:
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Costruisce il contesto conversazionale (ultimi 10 messaggi per ridurre i token)
-        chat_history = [{"text": msg["message"]} for msg in sorted_messages[-10:]]
+        # Costruzione del contesto conversazionale basato sulla struttura di Gemini
+        chat_history = [
+            Content(role="user", parts=[Part.from_text(msg["message"])] ) for msg in sorted_messages[-10:]
+        ]
+        
+        gemini_contents = [
+            Content(role="system", parts=[Part.from_text(prompt_text)]),
+            *chat_history,
+            Content(role="user", parts=[Part.from_text(user_text)])
+        ]
 
-        # Chiamata a Gemini per generare la risposta
+        # Configurazione della generazione di contenuti
+        gen_config = GenerateContentConfig(
+            response_mime_type="text/plain",
+            system_instruction=[Part.from_text(prompt_text)]
+        )
+
+        # Generazione della risposta
         try:
-            prompt_input = [{"text": prompt_prefix}] + chat_history
-            context.log(f"Prompt inviato a Gemini: {prompt_input}")
-            
             response = model.generate_content(
-                prompt_input, 
-                generation_config={
-                    "temperature": 0.7, 
-                    "max_output_tokens": 100,  # Ridotto per evitare risposte troppo lunghe
-                    "top_k": 1
-                }
+                contents=gemini_contents, 
+                config=gen_config
             )
+            
             context.log(f"Risposta grezza di Gemini: {response}")
-
-            # Estrai il testo dalla risposta
+            
             if response and hasattr(response, 'candidates') and response.candidates:
                 raw_reply = response.candidates[0].content.parts[0].text.strip()
             else:
@@ -87,7 +95,7 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             raw_reply = "😘!"
 
-        # **Taglia la risposta in modo più pulito (fermandosi al primo punto o punto esclamativo)**
+        # Funzione per troncare la risposta con logica pulita
         def cut_sentence(text, max_words=30):
             words = text.split()
             if len(words) <= max_words:
@@ -95,13 +103,13 @@ def main(context):
             short_text = " ".join(words[:max_words])
             for stop_char in [".", "!", "?"]:
                 if stop_char in short_text:
-                    return short_text[:short_text.rfind(stop_char) + 1]  # Tronca alla frase più vicina
-            return short_text + "..."  # Se non trova un punto, tronca a 30 parole
+                    return short_text[:short_text.rfind(stop_char) + 1]
+            return short_text + "..."
 
         reply_text = cut_sentence(raw_reply)
         context.log(f"Risposta generata (corta): {reply_text}")
 
-        # Invia la risposta all'utente su Instagram
+        # Invio della risposta all'utente
         send_url = "https://graph.instagram.com/v18.0/me/messages"
         send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
         send_headers = {"Content-Type": "application/json"}
