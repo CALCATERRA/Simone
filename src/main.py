@@ -2,25 +2,22 @@ import os
 import json
 import requests
 import google.generativeai as genai
-from datetime import datetime
-from google.generativeai.types import Content, Part, GenerateContentConfig
 
 def main(context):
     try:
         context.log("Funzione avviata")
-        
-        # Carica il prompt base
-        with open(os.path.join(os.path.dirname(__file__), "prompt.txt"), "r") as f:
-            prompt_text = f.read()
-        
-        instagram_token = os.getenv("INSTAGRAM_TOKEN")
-        gemini_api_key = os.getenv("GEMINI_API_KEY")
-        
-        # Configura Gemini
+
+        # Carica il prompt dal file JSON
+        with open(os.path.join(os.path.dirname(__file__), "prompt.json"), "r") as f:
+            prompt_data = json.load(f)
+
+        instagram_token = os.environ["INSTAGRAM_TOKEN"]
+        gemini_api_key = os.environ["GEMINI_API_KEY"]
+
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
-        
-        # Recupera le conversazioni recenti da Instagram
+
+        # Ottieni i messaggi più recenti
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
         convo_params = {"fields": "messages{message,from,id,created_time}", "access_token": instagram_token}
         convo_res = requests.get(convo_url, params=convo_params)
@@ -37,7 +34,7 @@ def main(context):
             context.log("Nessun messaggio nella conversazione.")
             return context.res.send("Nessun messaggio utile.")
 
-        # Recupera l'ID della pagina per evitare loop
+        # Ottieni l'ID della pagina per evitare loop
         page_info_url = "https://graph.instagram.com/me"
         page_info_params = {"fields": "id", "access_token": instagram_token}
         page_info_res = requests.get(page_info_url, params=page_info_params)
@@ -54,48 +51,37 @@ def main(context):
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
 
-        # Ignora i messaggi inviati dalla stessa pagina
+        # Ignora i messaggi della pagina stessa
         if user_id == page_id:
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Costruzione del contesto conversazionale basato sulla struttura di Gemini
-        chat_history = [
-            Content(role="user", parts=[Part.from_text(msg["message"])] ) for msg in sorted_messages[-10:]
-        ]
+        # Costruisce il contesto della conversazione
+        chat_history = [{"role": "user", "parts": [{"text": msg["message"]}]} for msg in sorted_messages[-10:]]
         
-        gemini_contents = [
-            Content(role="system", parts=[Part.from_text(prompt_text)]),
-            *chat_history,
-            Content(role="user", parts=[Part.from_text(user_text)])
-        ]
+        # Aggiungi il prompt al contesto
+        system_instruction = [{"role": "system", "parts": [{"text": prompt_data["system_instruction"]}]}]
 
-        # Configurazione della generazione di contenuti
-        gen_config = GenerateContentConfig(
-            response_mime_type="text/plain",
-            system_instruction=[Part.from_text(prompt_text)]
-        )
-
-        # Generazione della risposta
+        # Chiamata a Gemini
         try:
             response = model.generate_content(
-                contents=gemini_contents, 
-                config=gen_config
+                system_instruction + chat_history,
+                generation_config={
+                    "temperature": 0.7,
+                    "max_output_tokens": 100,
+                    "top_k": 1
+                }
             )
-            
             context.log(f"Risposta grezza di Gemini: {response}")
-            
-            if response and hasattr(response, 'candidates') and response.candidates:
-                raw_reply = response.candidates[0].content.parts[0].text.strip()
-            else:
-                context.error(f"Nessun testo generato. Risultato: {response}")
-                raw_reply = "😘!"
+
+            # Estrai il testo dalla risposta
+            raw_reply = response.text.strip() if response.text else "😘!"
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             raw_reply = "😘!"
 
-        # Funzione per troncare la risposta con logica pulita
+        # Taglia la risposta
         def cut_sentence(text, max_words=30):
             words = text.split()
             if len(words) <= max_words:
@@ -109,7 +95,7 @@ def main(context):
         reply_text = cut_sentence(raw_reply)
         context.log(f"Risposta generata (corta): {reply_text}")
 
-        # Invio della risposta all'utente
+        # Invia la risposta all'utente su Instagram
         send_url = "https://graph.instagram.com/v18.0/me/messages"
         send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
         send_headers = {"Content-Type": "application/json"}
