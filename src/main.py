@@ -69,7 +69,7 @@ def main(context):
                     "temperature": 0.8,
                     "top_k": 20,
                     "top_p": 0.9,
-                    "max_output_tokens": 512
+                    "max_output_tokens": 5120
                 }
             )
 
@@ -81,7 +81,7 @@ def main(context):
 
         # Taglia risposta se troppo lunga
         words = reply_text.split()
-        if len(words) > 30:
+        if len(words) > 15:
             reply_text = " ".join(words[:30]) + "..."
 
         # Invia la risposta
