@@ -17,7 +17,6 @@ def main(context):
 
         # Configura Gemini
         genai.configure(api_key=gemini_api_key)
-        client = genai.Client()
         model = "gemini-2.0-flash-thinking-exp-01-21"
 
         # Ottieni i messaggi più recenti
@@ -64,9 +63,7 @@ def main(context):
         ]
         generate_content_config = types.GenerateContentConfig(
             response_mime_type="text/plain",
-            system_instruction=[
-                types.Part.from_text(text=prompt_data["system_instruction"])
-            ],
+            system_instruction=[types.Part.from_text(text=prompt_data["system_instruction"])],
             temperature=0.7,
             max_output_tokens=100,
             top_k=1
@@ -74,7 +71,7 @@ def main(context):
 
         # Genera risposta con Gemini
         try:
-            chunks = client.models.generate_content_stream(
+            chunks = genai.models.generate_content_stream(
                 model=model,
                 contents=contents,
                 config=generate_content_config
