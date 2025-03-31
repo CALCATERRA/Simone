@@ -68,15 +68,17 @@ def main(context):
 
         # Costruisce il contesto conversazionale (ultimi 15 messaggi)
         chat_history = [
-            {"role": "user" if msg["from"]["id"] != page_id else "assistant", "content": msg["message"]}
+            {"role": "user" if msg["from"]["id"] != page_id else "assistant", "text": msg["message"]}
             for msg in sorted_messages[-15:]
         ]
 
         # Chiamata a Gemini per generare la risposta
         try:
-            response = model.generate_content([
-                {"role": "system", "content": prompt_prefix}
-            ] + chat_history)
+            response = model.generate_content({
+                "parts": [
+                    {"role": "system", "text": prompt_prefix}
+                ] + chat_history
+            })
             raw_reply = response.text.strip() if response and hasattr(response, 'text') else ""
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
