@@ -66,11 +66,19 @@ def main(context):
             prompt_input = [{"text": prompt_prefix}] + chat_history
             context.log(f"Prompt inviato a Gemini: {prompt_input}")
             
-            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 200, "top_k": 1})
+            response = model.generate_content(
+                prompt_input, 
+                generation_config={
+                    "temperature": 0.7, 
+                    "max_output_tokens": 100,  # Ridotto per evitare risposte troppo lunghe
+                    "top_k": 1
+                }
+            )
             context.log(f"Risposta grezza di Gemini: {response}")
 
-            if response and hasattr(response, 'text'):
-                raw_reply = response.text.strip()
+            # Estrai il testo dalla risposta
+            if response and hasattr(response, 'candidates') and response.candidates:
+                raw_reply = response.candidates[0].content.parts[0].text.strip()
             else:
                 context.error(f"Nessun testo generato. Risultato: {response}")
                 raw_reply = "😘!"
@@ -79,13 +87,19 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             raw_reply = "😘!"
 
-        # Limita la lunghezza della risposta a 30 parole
-        reply_text = " ".join(raw_reply.splitlines()).strip()
-        words = reply_text.split()
-        if len(words) > 30:
-            reply_text = " ".join(words[:30]) + "..."
+        # **Taglia la risposta in modo più pulito (fermandosi al primo punto o punto esclamativo)**
+        def cut_sentence(text, max_words=30):
+            words = text.split()
+            if len(words) <= max_words:
+                return text
+            short_text = " ".join(words[:max_words])
+            for stop_char in [".", "!", "?"]:
+                if stop_char in short_text:
+                    return short_text[:short_text.rfind(stop_char) + 1]  # Tronca alla frase più vicina
+            return short_text + "..."  # Se non trova un punto, tronca a 30 parole
 
-        context.log(f"Risposta generata: {reply_text}")
+        reply_text = cut_sentence(raw_reply)
+        context.log(f"Risposta generata (corta): {reply_text}")
 
         # Invia la risposta all'utente su Instagram
         send_url = "https://graph.instagram.com/v18.0/me/messages"
