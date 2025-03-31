@@ -58,27 +58,35 @@ def main(context):
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Costruisce il contesto conversazionale (ultimi 5 messaggi per ridurre i token)
+        # Costruisce il contesto conversazionale (ultimi 5 messaggi)
         chat_history = [{"text": msg["message"]} for msg in sorted_messages[-5:]]
+
+        # Creiamo il prompt da inviare a Gemini
+        prompt_input = [{"text": prompt_prefix}] + chat_history
+
+        # Log per debugging
+        context.log(f"Prompt inviato a Gemini: {json.dumps(prompt_input, indent=2)}")
 
         # Chiamata a Gemini per generare la risposta
         try:
-            prompt_input = [{"text": prompt_prefix}] + chat_history
-            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 50, "top_k": 1})
+            response = model.generate_content(
+                prompt_input,
+                generation_config={"temperature": 0.7, "max_output_tokens": 50, "top_k": 1}
+            )
 
             # Log della risposta completa
             context.log(f"Risposta completa di Gemini: {response}")
 
-            # Controllo robusto sulla risposta
+            # Controllo se ci sono candidati
             if response and hasattr(response, "candidates") and response.candidates:
                 raw_reply = response.candidates[0].content.strip()
             else:
                 context.error(f"Nessun testo generato. Risultato: {response}")
-                raw_reply = "😘!"
+                raw_reply = "😘!"  # Default di fallback
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "😘"
+            raw_reply = "😘!"
 
         # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
