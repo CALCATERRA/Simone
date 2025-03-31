@@ -59,34 +59,28 @@ def main(context):
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Costruisce il contesto conversazionale (ultimi 15 messaggi)
-        chat_history = [{"text": msg["message"]} for msg in sorted_messages[-15:]]
+        # Costruisce il contesto conversazionale (ultimi 10 messaggi per ridurre i token)
+        chat_history = [{"text": msg["message"]} for msg in sorted_messages[-10:]]
 
         # Chiamata a Gemini per generare la risposta
         try:
-            # Combina il prompt dal file con la cronologia dei messaggi
+            # Combina il prompt dal file con la cronologia dei messaggi (provare con meno messaggi)
             prompt_input = [{"text": prompt_prefix}] + chat_history
-            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
+            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 50, "top_k": 1})
 
-            # Log dettagliato della risposta completa
+            # Log della risposta completa
             context.log(f"Risposta completa di Gemini: {response}")
 
-            # Log dei metadati per esaminare meglio la risposta
-            if hasattr(response, 'result'):
-                context.log(f"Dettagli del risultato: {response.result}")
-            else:
-                context.error("La risposta non contiene un campo 'result'.")
-
-            # Verifica se la risposta contiene effettivamente un risultato utile
+            # Verifica se la risposta contiene un candidato
             if response and hasattr(response, 'result') and 'text' in response.result:
                 raw_reply = response.result['text'].strip()
             else:
                 context.error(f"Nessun testo generato. Risultato: {response.result if hasattr(response, 'result') else 'Nessun risultato'}")
-                raw_reply = "Mi dispiace, non sono riuscito a generare una risposta al momento."
+                raw_reply = "😘!"
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "Mi dispiace, non sono riuscito a generare una risposta al momento."
+            raw_reply = "😘"
 
         # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
