@@ -64,7 +64,7 @@ def main(context):
                 prompt_parts,
                 generation_config={
                     "temperature": 0.7,
-                    "max_output_tokens": 1024,
+                    "max_output_tokens": 10240,
                     "top_k": 1
                 }
             )
@@ -80,7 +80,7 @@ def main(context):
 
         # Limita a 30 parole
         words = reply_text.split()
-        if len(words) > 30:
+        if len(words) > 15:
             reply_text = " ".join(words[:30]) + "..."
 
         # Invia la risposta
