@@ -64,9 +64,9 @@ def main(context):
         try:
             # Combina il prompt dal file con la cronologia dei messaggi
             prompt_input = [{"text": prompt_prefix}] + chat_history
-            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 50, "top_k": 1})
+            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
 
-            # Log della risposta completa
+            # Log della risposta grezza
             context.log(f"Risposta grezza di Gemini: {response}")
 
             # Verifica la presenza di candidati nella risposta
@@ -80,11 +80,10 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             raw_reply = "😘"
 
-        # Limita la lunghezza della risposta a 30 parole
-        reply_text = " ".join(raw_reply.splitlines()).strip()
-        words = reply_text.split()
-        if len(words) > 30:
-            reply_text = " ".join(words[:30]) + "..."
+        # Limita la lunghezza della risposta a 150 caratteri (modifica questo limite secondo necessità)
+        reply_text = raw_reply[:150]  # Tronca a 150 caratteri
+        if len(raw_reply) > 150:
+            reply_text += "..."  # Aggiungi "..." se il testo è stato troncato
 
         context.log(f"Risposta generata: {reply_text}")
 
