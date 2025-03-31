@@ -68,14 +68,20 @@ def main(context):
             prompt_input = [{"text": prompt_prefix}] + chat_history
             response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
 
+            # Log della risposta completa per capire la struttura
+            context.log(f"Risposta completa di Gemini: {response}")
+
+            # Verifica se la risposta ha dei candidati
             if response and hasattr(response, 'candidates') and len(response.candidates) > 0:
-                raw_reply = response.candidates[0].text.strip()
+                # Se i candidati esistono, prendi il primo e verifica il testo
+                raw_reply = response.candidates[0].get('text', 'Risposta mancante').strip()
             else:
                 context.error(f"Nessun candidato generato dalla risposta di Gemini. Risposta completa: {response}")
-                raw_reply = "😘!"
+                raw_reply = "Mi dispiace, non sono riuscito a generare una risposta al momento."
+
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "😘!"
+            raw_reply = "Mi dispiace, non sono riuscito a generare una risposta al momento."
 
         # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
