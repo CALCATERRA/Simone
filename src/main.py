@@ -71,12 +71,21 @@ def main(context):
 
         # Chiamata a Gemini per generare la risposta
         try:
-            response = model.generate_content([{"text": prompt_prefix}] + chat_history, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
-            raw_reply = response.text.strip() if response and hasattr(response, 'text') else ""
+            # Combina il prompt dal file con la cronologia dei messaggi
+            prompt_input = [{"text": prompt_prefix}] + chat_history
+            
+            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 100, "top_k": 1})
+            
+            # Verifica se la risposta contiene candidati
+            if response and 'candidates' in response and len(response.candidates) > 0:
+                raw_reply = response.candidates[0].text.strip()  # Usa il primo candidato della risposta
+            else:
+                raw_reply = "😘!"  # Risposta di default se non ci sono candidati
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "😘!"
+            raw_reply = "😘!"  # Risposta di fallback in caso di errore
 
+        # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
         words = reply_text.split()
         if len(words) > 30:
