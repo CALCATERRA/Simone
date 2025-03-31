@@ -68,7 +68,7 @@ def main(context):
 
         # Costruisce il contesto conversazionale (ultimi 15 messaggi)
         chat_history = [
-            {"role": "user" if msg["from"]["id"] != page_id else "assistant", "text": msg["message"]}
+            {"text": msg["message"]}
             for msg in sorted_messages[-15:]
         ]
 
@@ -76,8 +76,8 @@ def main(context):
         try:
             response = model.generate_content({
                 "parts": [
-                    {"role": "system", "text": prompt_prefix}
-                ] + chat_history
+                    {"text": prompt_prefix}
+                ] + [{"text": msg["message"]} for msg in sorted_messages[-15:]]
             })
             raw_reply = response.text.strip() if response and hasattr(response, 'text') else ""
         except Exception as e:
