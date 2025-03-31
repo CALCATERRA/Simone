@@ -51,7 +51,6 @@ def main(context):
         # Ordina i messaggi per data
         sorted_messages = sorted(messages, key=lambda m: m["created_time"])
         last_msg = sorted_messages[-1]
-        message_id = last_msg["id"]
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
 
@@ -68,20 +67,22 @@ def main(context):
             return context.res.send("Messaggio ignorato per evitare duplicati.")
 
         # Costruisce il contesto conversazionale (ultimi 15 messaggi)
-        chat_history = []
-        for msg in sorted_messages[-15:]:
-            role = "user" if msg["from"]["id"] != page_id else "assistant"
-            chat_history.append({"role": role, "content": msg["message"]})
+        chat_history = [
+            {"role": "user" if msg["from"]["id"] != page_id else "assistant", "content": msg["message"]}
+            for msg in sorted_messages[-15:]
+        ]
 
         # Chiamata a Gemini per generare la risposta
-        response = model.generate_content([
-            {"role": "system", "content": prompt_prefix}
-        ] + chat_history)
-        
-        raw_reply = response.text.strip()
-        reply_text = " ".join(raw_reply.splitlines()).strip()
+        try:
+            response = model.generate_content([
+                {"role": "system", "content": prompt_prefix}
+            ] + chat_history)
+            raw_reply = response.text.strip() if response and hasattr(response, 'text') else ""
+        except Exception as e:
+            context.error(f"Errore nella generazione della risposta: {str(e)}")
+            raw_reply = "Scusa, al momento non posso rispondere."
 
-        # Limita la risposta a 30 parole
+        reply_text = " ".join(raw_reply.splitlines()).strip()
         words = reply_text.split()
         if len(words) > 30:
             reply_text = " ".join(words[:30]) + "..."
