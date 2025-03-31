@@ -56,19 +56,13 @@ def main(context):
         # Prepara il contenuto per Gemini (ora inviamo il testo direttamente)
         user_message = user_text.strip()
 
-        # Genera risposta con Gemini
+        # Genera risposta con Gemini (usiamo il metodo corretto)
         try:
-            # Chiamata all'API di Gemini per generare la risposta
-            response = genai.chat(
+            response = genai.generate(
                 model=model,
-                messages=[{
-                    "role": "user",
-                    "content": user_message
-                }],
-                system_instruction=prompt_data["system_instruction"],
+                prompt=user_message,  # Il prompt dell'utente
                 temperature=0.7,
-                max_output_tokens=100,
-                top_k=1
+                max_output_tokens=100
             )
 
             full_text = response.get("text", "")
@@ -121,4 +115,3 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
-
