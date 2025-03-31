@@ -1,15 +1,13 @@
 import os
 import json
 import requests
-import time
-from datetime import datetime, timezone
 import google.generativeai as genai
 
 def main(context):
     try:
         context.log("Funzione avviata")
 
-        # Legge il prompt dal file
+        # Legge il prompt dal file prompt.txt
         with open(os.path.join(os.path.dirname(__file__), "prompt.txt"), "r") as f:
             prompt_prefix = f.read()
 
@@ -69,11 +67,10 @@ def main(context):
             response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 50, "top_k": 1})
 
             # Log della risposta completa
-            context.log(f"Risposta completa di Gemini: {response}")
+            context.log(f"Risposta grezza di Gemini: {response}")
 
-            # Verifica se la risposta contiene un candidato
+            # Verifica la presenza di candidati nella risposta
             if response and hasattr(response, 'candidates') and len(response.candidates) > 0:
-                # Estrarre il testo dalla risposta
                 raw_reply = response.candidates[0].content.parts[0].text.strip()
             else:
                 context.error(f"Nessun testo generato. Risultato: {response}")
@@ -81,7 +78,7 @@ def main(context):
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            raw_reply = "😘"  # Messaggio di fallback
+            raw_reply = "😘"
 
         # Limita la lunghezza della risposta a 30 parole
         reply_text = " ".join(raw_reply.splitlines()).strip()
