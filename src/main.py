@@ -10,7 +10,7 @@ def main(context):
 
         # Legge il prompt dal file
         with open(os.path.join(os.path.dirname(__file__), "prompt.txt"), "r") as f:
-            prompt_prefix = f.read().strip()
+            prompt_prefix = f.read()
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
         gemini_api_key = os.environ["GEMINI_API_KEY"]
@@ -58,31 +58,22 @@ def main(context):
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Costruisce il contesto conversazionale (ultimi 5 messaggi)
-        chat_history = [{"text": msg["message"]} for msg in sorted_messages[-5:]]
-
-        # Creiamo il prompt da inviare a Gemini
-        prompt_input = [{"text": prompt_prefix}] + chat_history
-
-        # Log per debugging
-        context.log(f"Prompt inviato a Gemini: {json.dumps(prompt_input, indent=2)}")
+        # Costruisce il contesto conversazionale (ultimi 10 messaggi per ridurre i token)
+        chat_history = [{"text": msg["message"]} for msg in sorted_messages[-10:]]
 
         # Chiamata a Gemini per generare la risposta
         try:
-            response = model.generate_content(
-                prompt_input,
-                generation_config={"temperature": 0.7, "max_output_tokens": 50, "top_k": 1}
-            )
+            prompt_input = [{"text": prompt_prefix}] + chat_history
+            context.log(f"Prompt inviato a Gemini: {prompt_input}")
+            
+            response = model.generate_content(prompt_input, generation_config={"temperature": 0.7, "max_output_tokens": 200, "top_k": 1})
+            context.log(f"Risposta grezza di Gemini: {response}")
 
-            # Log della risposta completa
-            context.log(f"Risposta completa di Gemini: {response}")
-
-            # Controllo se ci sono candidati
-            if response and hasattr(response, "candidates") and response.candidates:
-                raw_reply = response.candidates[0].content.strip()
+            if response and hasattr(response, 'text'):
+                raw_reply = response.text.strip()
             else:
                 context.error(f"Nessun testo generato. Risultato: {response}")
-                raw_reply = "😘!"  # Default di fallback
+                raw_reply = "😘!"
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
