@@ -59,13 +59,6 @@ def main(context):
             context.log("Messaggio proveniente dalla pagina stessa. Nessuna risposta.")
             return context.res.send("Messaggio interno ignorato.")
 
-        # Controllo temporale: ignora messaggi troppo recenti (modificato a 60 secondi)
-        msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
-        if (now - msg_time).total_seconds() < 60:  # Cambiato a 60 secondi
-            context.log("Messaggio troppo recente, potenziale duplicato. Ignorato.")
-            return context.res.send("Messaggio ignorato per evitare duplicati.")
-
         # Costruisce il contesto conversazionale (ultimi 15 messaggi)
         chat_history = [{"text": msg["message"]} for msg in sorted_messages[-15:]]
 
