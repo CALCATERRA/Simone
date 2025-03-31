@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import google.generativeai as genai
+from google.generativeai import types
 
 def main(context):
     try:
@@ -16,6 +17,7 @@ def main(context):
 
         # Configura Gemini
         genai.configure(api_key=gemini_api_key)
+        client = genai.Client()
         model = "gemini-2.0-flash-thinking-exp-01-21"
 
         # Ottieni i messaggi più recenti
@@ -53,16 +55,33 @@ def main(context):
         if user_id == page_id:
             return context.res.send("Messaggio interno ignorato.")
 
-        # Prepara il contenuto per Gemini (ora inviamo il testo direttamente)
-        user_message = user_text.strip()
+        # Prepara il contenuto per Gemini
+        contents = [
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=user_text)]
+            )
+        ]
+        
+        # Prepara il prompt di sistema
+        system_instruction = prompt_data["system_instruction"]
 
-        # Genera risposta con Gemini (usiamo il metodo corretto)
+        # Imposta la configurazione per la generazione del contenuto
+        generate_content_config = types.GenerateContentConfig(
+            response_mime_type="text/plain",
+            system_instruction=[types.Part.from_text(text=system_instruction)],
+            temperature=0.7,
+            max_output_tokens=100,
+            top_k=1
+        )
+
+        # Genera risposta con Gemini
         try:
-            response = genai.generate(
+            # Modifica qui: usa client.chat() se è disponibile
+            response = client.chat(
                 model=model,
-                prompt=user_message,  # Il prompt dell'utente
-                temperature=0.7,
-                max_output_tokens=100
+                contents=contents,  # Invia il contenuto, includendo il testo dell'utente
+                config=generate_content_config
             )
 
             full_text = response.get("text", "")
