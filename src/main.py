@@ -1,8 +1,9 @@
 import os
 import json
 import requests
+import time
+from datetime import datetime, timezone
 import google.generativeai as genai
-from google.generativeai import types
 
 def main(context):
     try:
@@ -19,7 +20,7 @@ def main(context):
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
 
-        # Ottieni i messaggi più recenti
+        # Recupera i messaggi recenti
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
         convo_params = {"fields": "messages{message,from,id,created_time}", "access_token": instagram_token}
         convo_res = requests.get(convo_url, params=convo_params)
@@ -30,99 +31,66 @@ def main(context):
 
         last_convo = convo_data["data"][0]
         messages = last_convo.get("messages", {}).get("data", [])
-
         if not messages:
             return context.res.send("Nessun messaggio utile.")
 
-        # Ottieni ID della pagina per evitare risposte a se stessa
+        # Evita loop rispondendo a sé stesso
         page_info_url = "https://graph.instagram.com/me"
         page_info_params = {"fields": "id", "access_token": instagram_token}
-        page_info_res = requests.get(page_info_url, params=page_info_params)
-        page_info = page_info_res.json()
-        page_id = page_info.get("id")
-
+        page_id = requests.get(page_info_url, params=page_info_params).json().get("id")
         if not page_id:
-            return context.res.send("Errore nel recupero dell'ID pagina.")
+            return context.res.send("Errore nel recupero ID pagina.")
 
-        # Ordina i messaggi e prendi l'ultimo dell'utente
         sorted_messages = sorted(messages, key=lambda m: m["created_time"])
         last_msg = sorted_messages[-1]
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
 
-        # Ignora i messaggi della pagina stessa
         if user_id == page_id:
             return context.res.send("Messaggio interno ignorato.")
 
-        # Prepara il contenuto per Gemini
-        contents = [
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=user_text)]
-            )
-        ]
-        generate_content_config = types.GenerateContentConfig(
-            response_mime_type="text/plain",
-            system_instruction=[types.Part.from_text(text=prompt_data["system_instruction"])],
-            temperature=0.7,
-            max_output_tokens=1024,  # Aumenta i token per risposte più lunghe
-            top_k=1,
-            candidate_count=1        # Imposta per generare solo un candidato
-        )
+        # Ignora messaggi troppo recenti
+        msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
+        if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
+            return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Genera risposta con Gemini
+        # Costruisce il prompt da system_instruction + ultimi messaggi
+        prompt_parts = [{"text": prompt_data["system_instruction"]}]
+        prompt_parts += [{"text": m["message"]} for m in sorted_messages[-10:]]
+
+        # Chiamata a Gemini
         try:
             response = model.generate_content(
-                contents,
-                generation_config=generate_content_config
+                prompt_parts,
+                generation_config={
+                    "temperature": 0.7,
+                    "max_output_tokens": 512,
+                    "top_k": 1
+                }
             )
 
-            # Estrai la risposta dal modello
-            full_text = response.text.strip() if response and hasattr(response, 'text') else ""
+            if not response.candidates or not response.text:
+                raise ValueError("Gemini non ha generato risposte.")
 
-            # Funzione per deduplicare frasi troppo simili
-            def dedup_responses(text):
-                parts = [p.strip() for p in text.split("\n") if p.strip()]
-                seen = set()
-                filtered = []
-                for p in parts:
-                    low = p.lower().strip("!?.")
-                    if low not in seen:
-                        seen.add(low)
-                        filtered.append(p)
-                return " ".join(filtered)
-
-            # Funzione per tagliare a max 30 parole
-            def cut_sentence(text, max_words=30):
-                words = text.split()
-                if len(words) <= max_words:
-                    return text
-                short = " ".join(words[:max_words])
-                for stop in [".", "!", "?"]:
-                    if stop in short:
-                        return short[:short.rfind(stop) + 1]
-                return short + "..."
-
-            # Applica combinazione intelligente
-            clean_text = dedup_responses(full_text.strip())
-            reply_text = cut_sentence(clean_text)
+            reply_text = response.text.strip()
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘!"
 
-        # Invia la risposta all'utente su Instagram
+        # Limita a 30 parole
+        words = reply_text.split()
+        if len(words) > 30:
+            reply_text = " ".join(words[:30]) + "..."
+
+        # Invia la risposta
         send_url = "https://graph.instagram.com/v18.0/me/messages"
-        send_payload = {
-            "recipient": {"id": user_id},
-            "message": {"text": reply_text}
-        }
+        send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
         send_headers = {"Content-Type": "application/json"}
         send_params = {"access_token": instagram_token}
-
         send_res = requests.post(send_url, headers=send_headers, json=send_payload, params=send_params)
-        context.log(f"Risposta inviata: {send_res.status_code} - {send_res.text}")
 
+        context.log(f"Risposta inviata: {send_res.status_code} - {send_res.text}")
         return context.res.send("OK")
 
     except Exception as e:
