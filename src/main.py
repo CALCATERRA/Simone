@@ -1,7 +1,6 @@
 import os
 import json
 import requests
-import time
 from datetime import datetime, timezone
 import google.generativeai as genai
 
@@ -54,9 +53,16 @@ def main(context):
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Costruisce il prompt da system_instruction + ultimi messaggi
-        prompt_parts = [{"text": prompt_data["system_instruction"]}]
-        prompt_parts += [{"text": m["message"]} for m in sorted_messages[-10:]]
+        # Costruisce il prompt: system_instruction + cronologia + ultimo messaggio + inizio risposta
+        prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
+
+        # Aggiunge la cronologia (solo messaggi utente precedenti)
+        for m in sorted_messages[-10:]:
+            if m["from"]["id"] != page_id:
+                prompt_parts.append({"text": f"User: {m['message']}\nSimone: "})
+
+        # Solo l'ultimo messaggio con Simone in attesa di risposta
+        prompt_parts.append({"text": f"User: {user_text}\nSimone: "})
 
         # Chiamata a Gemini
         try:
@@ -78,10 +84,10 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘!"
 
-        # Limita a 30 parole
+        # Limita a 15 parole
         words = reply_text.split()
         if len(words) > 15:
-            reply_text = " ".join(words[:30]) + "..."
+            reply_text = " ".join(words[:15]) + "..."
 
         # Invia la risposta
         send_url = "https://graph.instagram.com/v18.0/me/messages"
