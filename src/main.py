@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import google.generativeai as genai
-from google.genai import types
+from google.generativeai import types
 
 def main(context):
     try:
