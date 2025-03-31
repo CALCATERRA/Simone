@@ -70,7 +70,7 @@ def main(context):
                 prompt_input, 
                 generation_config={
                     "temperature": 0.7, 
-                    "max_output_tokens": 2500,  # Ridotto per evitare risposte troppo lunghe
+                    "max_output_tokens": 100,  # Ridotto per evitare risposte troppo lunghe
                     "top_k": 1
                 }
             )
