@@ -3,8 +3,8 @@ import os
 import json
 import requests
 from datetime import datetime, timezone
-from google import genai
-from google.genai import types
+from google.generativeai import genai
+from google.generativeai import types
 
 def generate():
     client = genai.Client(
