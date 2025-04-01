@@ -3,4 +3,3 @@ openai
 requests
 python-dotenv
 google.generativeai
-google
