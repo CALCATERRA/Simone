@@ -56,7 +56,7 @@ def main(context):
         # Costruisce il prompt: system_instruction + cronologia (solo utente)
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
 
-        # Aggiunge solo i messaggi dell'utente (senza "Simone:")
+        # Aggiunge solo i messaggi precedenti dell'utente (senza "Simone:")
         for m in sorted_messages[-10:]:
             if m["from"]["id"] != page_id:
                 prompt_parts.append({"text": f"User: {m['message']}\n"})
