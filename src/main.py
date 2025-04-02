@@ -54,15 +54,20 @@ def main(context):
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Costruisce il prompt: system_instruction + cronologia (solo utente, ma solo 10 messaggi)
+        # **VERIFICA SE ABBIAMO GIÀ RISPOSTO**
+        for msg in sorted_messages[::-1]:  # Scansioniamo i messaggi a ritroso
+            if msg["from"]["id"] == page_id:  # Se un messaggio è stato inviato dal bot
+                context.log("Abbiamo già risposto a questo messaggio. Ignoriamo.")
+                return context.res.send("Risposta già inviata.")
+
+        # Costruisce il prompt: system_instruction + cronologia (solo utente, massimo 10 messaggi)
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
 
-        # Aggiunge solo i messaggi dell'utente (senza "Simone:"), solo i 10 più recenti
-        for m in sorted_messages[-10:]:
+        for m in sorted_messages[-10:]:  # Ultimi 10 messaggi dell'utente come contesto
             if m["from"]["id"] != page_id:
                 prompt_parts.append({"text": f"User: {m['message']}\n"})
 
-        # Solo l'ultimo messaggio dell'utente, per la risposta
+        # Aggiunge solo l'ultimo messaggio per la risposta
         prompt_parts.append({"text": f"User: {user_text}\n"})
 
         # Chiamata a Gemini per generare la risposta
@@ -84,7 +89,7 @@ def main(context):
 
             # Rimuove il prefisso "Simone:" dalla risposta, se presente
             if reply_text.startswith("Simone:"):
-                reply_text = reply_text[7:].strip()  # Rimuove "Simone:" e gli spazi
+                reply_text = reply_text[7:].strip()
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
