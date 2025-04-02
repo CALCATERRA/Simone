@@ -63,7 +63,7 @@ def main(context):
         # Costruisce il prompt: system_instruction + cronologia (solo utente, massimo 10 messaggi)
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
 
-        for m in sorted_messages[-10:]:  # Ultimi 10 messaggi dell'utente come contesto
+        for m in sorted_messages[-10:-1]:  # Ultimi 10 messaggi dell'utente come contesto
             if m["from"]["id"] != page_id:
                 prompt_parts.append({"text": f"User: {m['message']}\n"})
 
