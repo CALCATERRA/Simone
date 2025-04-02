@@ -70,8 +70,8 @@ def main(context):
                 prompt_parts,
                 generation_config={
                     "temperature": 0.7,
-                    "max_output_tokens": 6553,
-                    "top_P": 0.95,
+                    "max_output_tokens": 65536,
+                    "topP": 0.95,
                     "top_k": 1
                 }
             )
