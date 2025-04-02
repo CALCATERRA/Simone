@@ -40,6 +40,7 @@ def main(context):
         if not page_id:
             return context.res.send("Errore nel recupero ID pagina.")
 
+        # Ordina i messaggi per data
         sorted_messages = sorted(messages, key=lambda m: m["created_time"])
         last_msg = sorted_messages[-1]
         user_id = last_msg["from"]["id"]
@@ -53,10 +54,10 @@ def main(context):
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Costruisce il prompt: system_instruction + cronologia (solo utente)
+        # Costruisce il prompt: system_instruction + cronologia (solo utente, ma solo 10 messaggi)
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
 
-        # Aggiunge solo i messaggi precedenti dell'utente (senza "Simone:")
+        # Aggiunge solo i messaggi dell'utente (senza "Simone:"), solo i 10 più recenti
         for m in sorted_messages[-10:]:
             if m["from"]["id"] != page_id:
                 prompt_parts.append({"text": f"User: {m['message']}\n"})
@@ -64,7 +65,7 @@ def main(context):
         # Solo l'ultimo messaggio dell'utente, per la risposta
         prompt_parts.append({"text": f"User: {user_text}\n"})
 
-        # Chiamata a Gemini
+        # Chiamata a Gemini per generare la risposta
         try:
             response = model.generate_content(
                 prompt_parts,
@@ -89,7 +90,7 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘!"
 
-        # Limita a 15 parole
+        # Limita la risposta a 15 parole
         words = reply_text.split()
         if len(words) > 15:
             reply_text = " ".join(words[:15]) + "..."
