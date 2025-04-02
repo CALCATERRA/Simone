@@ -71,8 +71,7 @@ def main(context):
                 generation_config={
                     "temperature": 0.7,
                     "max_output_tokens": 65536,
-                    "topP": 0.95,
-                    "top_k": 1
+                    "top_k": 64
                 }
             )
 
