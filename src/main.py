@@ -69,9 +69,10 @@ def main(context):
             response = model.generate_content(
                 prompt_parts,
                 generation_config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 5024,
-                    "top_k": 1
+                    "temperature": 0.7f,
+                    "max_output_tokens": 65536,
+                    "top_P" = 0.95f
+                    "top_k": 64
                 }
             )
 
