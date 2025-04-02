@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import time
 from datetime import datetime, timezone
 import google.generativeai as genai
 
@@ -54,15 +55,15 @@ def main(context):
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # **VERIFICA SE ABBIAMO GIÀ RISPOSTO**
-        for msg in sorted_messages[::-1]:  # Scansioniamo i messaggi a ritroso
-            if msg["from"]["id"] == page_id:  # Se un messaggio è stato inviato dal bot
-                context.log("Abbiamo già risposto a questo messaggio. Ignoriamo.")
-                return context.res.send("Risposta già inviata.")
+        # **Verifica se abbiamo già risposto di recente (entro 10 secondi)**
+        last_response_time = getattr(context, "last_response_time", None)
+        current_time = time.time()
+        if last_response_time and (current_time - last_response_time < 10):
+            context.log("Messaggio ignorato per evitare risposte duplicate.")
+            return context.res.send("Ignorato: risposta già inviata di recente.")
 
-        # Costruisce il prompt: system_instruction + cronologia (solo utente, massimo 10 messaggi)
+        # Costruisce il prompt: system_instruction + cronologia (solo utente, massimo 10 messaggi precedenti)
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
-
         for m in sorted_messages[-10:-1]:  # Ultimi 10 messaggi dell'utente come contesto
             if m["from"]["id"] != page_id:
                 prompt_parts.append({"text": f"User: {m['message']}\n"})
@@ -95,10 +96,10 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘!"
 
-        # Limita la risposta a 15 parole
+        # Limita la risposta a 20 parole
         words = reply_text.split()
-        if len(words) > 15:
-            reply_text = " ".join(words[:15]) + "..."
+        if len(words) > 20:
+            reply_text = " ".join(words[:20]) + "..."
 
         # Invia la risposta
         send_url = "https://graph.instagram.com/v18.0/me/messages"
@@ -106,6 +107,9 @@ def main(context):
         send_headers = {"Content-Type": "application/json"}
         send_params = {"access_token": instagram_token}
         send_res = requests.post(send_url, headers=send_headers, json=send_payload, params=send_params)
+
+        # Registra il tempo dell'ultima risposta per evitare spam
+        context.last_response_time = current_time
 
         context.log(f"Risposta inviata: {send_res.status_code} - {send_res.text}")
         return context.res.send("OK")
