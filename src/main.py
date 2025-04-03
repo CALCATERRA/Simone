@@ -71,30 +71,33 @@ def main(context):
         # Aggiunge solo l'ultimo messaggio per la risposta
         prompt_parts.append({"text": f"User: {user_text}\n"})
 
-        # Chiamata a Gemini per generare la risposta
-        try:
-            response = model.generate_content(
-                prompt_parts,
-                generation_config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 65536,
-                    "top_k": 64,
-                    "top_p": 0.95
-                }
-            )
+       # Chiamata a Gemini per generare la risposta
+       try:
+           response = model.generate_content(
+               [{"text": prompt_data["system_instruction"] + "\n"}] +  # System instruction
+               [{"text": f"Utente: {m['message']}\n"} for m in sorted_messages[-10:-1] if m["from"]["id"] != page_id] +  # Ultimi 10 messaggi dell'utente
+               [{"text": f"Utente: {user_text}\nSimone:"}],  # Ultimo messaggio + inizio risposta
+               generation_config={
+                   "temperature": 0.7,
+                   "max_output_tokens": 65536,
+                   "top_k": 64,
+                   "top_p": 0.95
+               }
+           )
 
-            if not response.candidates or not response.text:
-                raise ValueError("Gemini non ha generato risposte.")
+           if not response.candidates or not response.text:
+               raise ValueError("Gemini non ha generato risposte.")
 
-            reply_text = response.text.strip()
+           reply_text = response.text.strip()
 
-            # Rimuove il prefisso "Simone:" dalla risposta, se presente
-            if reply_text.startswith("Simone:"):
-                reply_text = reply_text[7:].strip()
+           # Rimuove eventuali prefissi indesiderati dalla risposta
+           for prefix in ["User:", "Utente:", "Response:", "Simone:"]:
+               if reply_text.startswith(prefix):
+                   reply_text = reply_text[len(prefix):].strip()
 
-        except Exception as e:
-            context.error(f"Errore nella generazione della risposta: {str(e)}")
-            reply_text = "😘!"
+       except Exception as e:
+           context.error(f"Errore nella generazione della risposta: {str(e)}")
+           reply_text = "😘!"
 
         # Limita la risposta a 20 parole
         words = reply_text.split()
