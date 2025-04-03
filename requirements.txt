@@ -3,4 +3,4 @@ openai
 requests
 python-dotenv
 google.generativeai
-langdetect
+langid
