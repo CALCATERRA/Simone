@@ -4,11 +4,6 @@ import requests
 import time
 from datetime import datetime, timezone
 import google.generativeai as genai
-import langid  # Aggiungi il modulo langid per il rilevamento della lingua
-
-def detect_language(text):
-    lang, _ = langid.classify(text)
-    return lang
 
 def main(context):
     try:
@@ -67,9 +62,6 @@ def main(context):
             context.log("Messaggio ignorato per evitare risposte duplicate.")
             return context.res.send("Ignorato: risposta già inviata di recente.")
 
-        # Detect the language of the user's message
-        user_lang = detect_language(user_text)
-
         # Costruisce il prompt: system_instruction + cronologia (solo utente, massimo 10 messaggi precedenti)
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
         for m in sorted_messages[-10:-1]:  # Ultimi 10 messaggi dell'utente come contesto
@@ -78,12 +70,6 @@ def main(context):
 
         # Aggiunge solo l'ultimo messaggio per la risposta
         prompt_parts.append({"text": f"Utente: {user_text}\nSimone:"})
-
-        # Imposta la lingua della risposta in base alla lingua dell'utente
-        if user_lang == 'it':
-            prompt_parts.append({"text": "Rispondi in italiano."})
-        elif user_lang == 'en':
-            prompt_parts.append({"text": "Reply in English."})
 
         # Chiamata a Gemini per generare la risposta
         try:
@@ -132,4 +118,3 @@ def main(context):
     except Exception as e:
         context.error(f"Errore: {str(e)}")
         return context.res.json({"error": str(e)}, 500)
-
