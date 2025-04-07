@@ -15,7 +15,7 @@ def main(context):
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
         # Funzione per ottenere la giusta chiave Gemini in base al giorno del mese
-        def get_rotated_gemini_key():
+       def get_rotated_gemini_key():
             day = datetime.now().day
             if day <= 6:
                 index = 1
@@ -27,7 +27,7 @@ def main(context):
                 index = 4
             else:
                 index = 5
-        return os.environ[f"GEMINI_API_KEY_{index}"]
+            return os.environ[f"GEMINI_API_KEY_{index}"]
 
         gemini_api_key = get_rotated_gemini_key()
 
