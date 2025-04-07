@@ -14,7 +14,19 @@ def main(context):
             prompt_data = json.load(f)
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
-        gemini_api_key = os.environ["GEMINI_API_KEY"]
+
+        # Seleziona la chiave Gemini in base al giorno del mese (rotazione ogni 5 giorni)
+        gemini_keys = [
+            os.environ["GEMINI_KEY_1"],
+            os.environ["GEMINI_KEY_2"],
+            os.environ["GEMINI_KEY_3"],
+            os.environ["GEMINI_KEY_4"],
+            os.environ["GEMINI_KEY_5"],
+            os.environ["GEMINI_KEY_6"],
+        ]
+        day_of_month = datetime.utcnow().day
+        key_index = min((day_of_month - 1) // 5, len(gemini_keys) - 1)
+        gemini_api_key = gemini_keys[key_index]
 
         # Configura Gemini
         genai.configure(api_key=gemini_api_key)
@@ -64,14 +76,12 @@ def main(context):
 
         # Costruisce il prompt: system_instruction + cronologia (solo utente, massimo 10 messaggi precedenti)
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
-        for m in sorted_messages[-10:-1]:  # Ultimi 10 messaggi dell'utente come contesto
+        for m in sorted_messages[-10:-1]:
             if m["from"]["id"] != page_id:
                 prompt_parts.append({"text": f"Utente: {m['message']}\n"})
 
-        # Aggiunge solo l'ultimo messaggio per la risposta
         prompt_parts.append({"text": f"Utente: {user_text}\nSimone:"})
 
-        # Chiamata a Gemini per generare la risposta
         try:
             response = model.generate_content(
                 prompt_parts,
@@ -88,28 +98,24 @@ def main(context):
 
             reply_text = response.text.strip()
 
-            # Rimuove eventuali prefissi indesiderati dalla risposta
             for prefix in ["User:", "Utente:", "Response:", "Simone:"]:
                 if reply_text.startswith(prefix):
                     reply_text = reply_text[len(prefix):].strip()
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            reply_text = "😘!"
+            reply_text = "😘"
 
-        # Limita la risposta a 20 parole
         words = reply_text.split()
         if len(words) > 20:
             reply_text = " ".join(words[:20]) + "..."
 
-        # Invia la risposta
         send_url = "https://graph.instagram.com/v18.0/me/messages"
         send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
         send_headers = {"Content-Type": "application/json"}
         send_params = {"access_token": instagram_token}
         send_res = requests.post(send_url, headers=send_headers, json=send_payload, params=send_params)
 
-        # Registra il tempo dell'ultima risposta per evitare spam
         context.last_response_time = current_time
 
         context.log(f"Risposta inviata: {send_res.status_code} - {send_res.text}")
