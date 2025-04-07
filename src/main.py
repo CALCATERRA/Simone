@@ -5,6 +5,20 @@ import time
 from datetime import datetime, timezone
 import google.generativeai as genai
 
+def get_rotated_gemini_key():
+    day = datetime.now().day
+    if day <= 6:
+        index = 1
+    elif day <= 12:
+        index = 2
+    elif day <= 18:
+        index = 3
+    elif day <= 24:
+        index = 4
+    else:
+        index = 5
+    return os.environ[f"GEMINI_API_KEY_{index}"]
+
 def main(context):
     try:
         context.log("Funzione avviata")
@@ -15,20 +29,6 @@ def main(context):
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
         # Funzione per ottenere la giusta chiave Gemini in base al giorno del mese
-       def get_rotated_gemini_key():
-            day = datetime.now().day
-            if day <= 6:
-                index = 1
-            elif day <= 12:
-                index = 2
-            elif day <= 18:
-                index = 3
-            elif day <= 24:
-                index = 4
-            else:
-                index = 5
-            return os.environ[f"GEMINI_API_KEY_{index}"]
-
         gemini_api_key = get_rotated_gemini_key()
 
         # Configura Gemini
@@ -110,7 +110,7 @@ def main(context):
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            reply_text = "😘!"
+            reply_text = "😘"
 
         # Limita la risposta a 20 parole
         words = reply_text.split()
