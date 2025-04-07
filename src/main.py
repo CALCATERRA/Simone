@@ -18,7 +18,7 @@ def main(context):
 
         # Configura Gemini
         genai.configure(api_key=gemini_api_key)
-        model = genai.GenerativeModel("gemini-2.5-pro-preview-3-25")
+        model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
 
         # Recupera i messaggi recenti
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
