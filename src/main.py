@@ -27,7 +27,9 @@ def main(context):
                 index = 4
             else:
                 index = 5
-        gemini_api_key = os.environ["GEMINI_API_KEY_{index}"]
+        return os.environ[f"GEMINI_API_KEY_{index}"]
+
+        gemini_api_key = get_rotated_gemini_key()
 
         # Configura Gemini
         genai.configure(api_key=gemini_api_key)
