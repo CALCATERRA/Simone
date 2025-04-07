@@ -5,21 +5,6 @@ import time
 from datetime import datetime, timezone
 import google.generativeai as genai
 
-# Funzione per ottenere la giusta chiave Gemini in base al giorno del mese
-def get_rotated_gemini_key():
-    day = datetime.now().day
-    if day <= 6:
-        index = 1
-    elif day <= 12:
-        index = 2
-    elif day <= 18:
-        index = 3
-    elif day <= 24:
-        index = 4
-    else:
-        index = 5
-    return os.environ.get(f"GEMINI_API_KEY_{index}")
-
 def main(context):
     try:
         context.log("Funzione avviata")
@@ -29,10 +14,20 @@ def main(context):
             prompt_data = json.load(f)
 
         instagram_token = os.environ["INSTAGRAM_TOKEN"]
-        gemini_api_key = get_rotated_gemini_key()  # Chiave selezionata dinamicamente
-
-        if not gemini_api_key:
-            return context.res.send("Chiave Gemini non trovata per questo giorno.")
+        # Funzione per ottenere la giusta chiave Gemini in base al giorno del mese
+        def get_rotated_gemini_key():
+            day = datetime.now().day
+            if day <= 6:
+                index = 1
+            elif day <= 12:
+                index = 2
+            elif day <= 18:
+                index = 3
+            elif day <= 24:
+                index = 4
+            else:
+                index = 5
+        gemini_api_key = os.environ["GEMINI_API_KEY_{index}"]
 
         # Configura Gemini
         genai.configure(api_key=gemini_api_key)
@@ -73,7 +68,7 @@ def main(context):
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # Verifica se abbiamo già risposto di recente (entro 10 secondi)
+        # **Verifica se abbiamo già risposto di recente (entro 10 secondi)**
         last_response_time = getattr(context, "last_response_time", None)
         current_time = time.time()
         if last_response_time and (current_time - last_response_time < 10):
@@ -113,7 +108,7 @@ def main(context):
 
         except Exception as e:
             context.error(f"Errore nella generazione della risposta: {str(e)}")
-            reply_text = "😘"
+            reply_text = "😘!"
 
         # Limita la risposta a 20 parole
         words = reply_text.split()
