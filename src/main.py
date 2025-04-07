@@ -1,32 +1,26 @@
-import os
 import json
 import requests
 import time
 from datetime import datetime, timezone
 import google.generativeai as genai
 
+def get_rotated_gemini_key(context):
+    day = datetime.utcnow().day
+    index = min((day - 1) // 5 + 1, 6)
+    env_key_name = f"GEMINI_KEY_{index}"
+    context.log(f"Uso chiave: {env_key_name}")
+    return context.env[env_key_name]
+
 def main(context):
     try:
         context.log("Funzione avviata")
 
         # Carica il prompt da prompt.json
-        with open(os.path.join(os.path.dirname(__file__), "prompt.json"), "r") as f:
+        with open("prompt.json", "r") as f:
             prompt_data = json.load(f)
 
-        instagram_token = os.environ["INSTAGRAM_TOKEN"]
-
-        # Seleziona la chiave Gemini in base al giorno del mese (rotazione ogni 5 giorni)
-        gemini_keys = [
-            os.environ["GEMINI_KEY_1"],
-            os.environ["GEMINI_KEY_2"],
-            os.environ["GEMINI_KEY_3"],
-            os.environ["GEMINI_KEY_4"],
-            os.environ["GEMINI_KEY_5"],
-            os.environ["GEMINI_KEY_6"],
-        ]
-        day_of_month = datetime.utcnow().day
-        key_index = min((day_of_month - 1) // 5, len(gemini_keys) - 1)
-        gemini_api_key = gemini_keys[key_index]
+        instagram_token = context.env["INSTAGRAM_TOKEN"]
+        gemini_api_key = get_rotated_gemini_key(context)
 
         # Configura Gemini
         genai.configure(api_key=gemini_api_key)
@@ -34,7 +28,10 @@ def main(context):
 
         # Recupera i messaggi recenti
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
-        convo_params = {"fields": "messages{message,from,id,created_time}", "access_token": instagram_token}
+        convo_params = {
+            "fields": "messages{message,from,id,created_time}",
+            "access_token": instagram_token
+        }
         convo_res = requests.get(convo_url, params=convo_params)
         convo_data = convo_res.json()
 
@@ -48,7 +45,10 @@ def main(context):
 
         # Evita loop rispondendo a sé stesso
         page_info_url = "https://graph.instagram.com/me"
-        page_info_params = {"fields": "id", "access_token": instagram_token}
+        page_info_params = {
+            "fields": "id",
+            "access_token": instagram_token
+        }
         page_id = requests.get(page_info_url, params=page_info_params).json().get("id")
         if not page_id:
             return context.res.send("Errore nel recupero ID pagina.")
@@ -67,14 +67,14 @@ def main(context):
         if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
             return context.res.send("Messaggio troppo recente, ignorato.")
 
-        # **Verifica se abbiamo già risposto di recente (entro 10 secondi)**
+        # Evita risposte duplicate entro 10 secondi
         last_response_time = getattr(context, "last_response_time", None)
         current_time = time.time()
         if last_response_time and (current_time - last_response_time < 10):
             context.log("Messaggio ignorato per evitare risposte duplicate.")
             return context.res.send("Ignorato: risposta già inviata di recente.")
 
-        # Costruisce il prompt: system_instruction + cronologia (solo utente, massimo 10 messaggi precedenti)
+        # Costruisce il prompt: system_instruction + ultimi messaggi utente
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
         for m in sorted_messages[-10:-1]:
             if m["from"]["id"] != page_id:
@@ -82,6 +82,7 @@ def main(context):
 
         prompt_parts.append({"text": f"Utente: {user_text}\nSimone:"})
 
+        # Chiamata a Gemini
         try:
             response = model.generate_content(
                 prompt_parts,
@@ -106,16 +107,22 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘"
 
+        # Limita la risposta a 20 parole
         words = reply_text.split()
         if len(words) > 20:
             reply_text = " ".join(words[:20]) + "..."
 
+        # Invia la risposta
         send_url = "https://graph.instagram.com/v18.0/me/messages"
-        send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
+        send_payload = {
+            "recipient": {"id": user_id},
+            "message": {"text": reply_text}
+        }
         send_headers = {"Content-Type": "application/json"}
         send_params = {"access_token": instagram_token}
         send_res = requests.post(send_url, headers=send_headers, json=send_payload, params=send_params)
 
+        # Registra il tempo dell'ultima risposta
         context.last_response_time = current_time
 
         context.log(f"Risposta inviata: {send_res.status_code} - {send_res.text}")
