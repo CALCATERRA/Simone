@@ -58,19 +58,27 @@ def main(context):
         if not page_id:
             return context.res.send("Errore nel recupero ID pagina.")
 
-        sorted_messages = sorted(messages, key=lambda m: m["created_time"])
-        last_msg = sorted_messages[-1]
+        # Ordina i messaggi per timestamp decrescente (dal più nuovo al più vecchio)
+        sorted_messages = sorted(messages, key=lambda m: m["created_time"], reverse=True)
+        last_msg = sorted_messages[0]
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
+        msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
+
         context.log(f"Ultimo messaggio da {user_id}: {user_text}")
+        context.log(f"Timestamp messaggio: {msg_time}")
+        now = datetime.now(timezone.utc)
+        diff_sec = (now - msg_time).total_seconds()
+        context.log(f"Adesso è: {now}")
+        context.log(f"Differenza in secondi: {diff_sec}")
 
         if user_id == page_id:
             return context.res.send("Messaggio interno ignorato.")
 
-        msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
-        if (datetime.now(timezone.utc) - msg_time).total_seconds() < 5:
+        # 🔧 Disattiva temporaneamente il filtro tempo per debugging
+        if diff_sec < 5:
             context.log("Messaggio troppo recente, ignorato.")
-            return context.res.send("Messaggio troppo recente, ignorato.")
+            # return context.res.send("Messaggio troppo recente, ignorato.")
 
         last_response_time = getattr(context, "last_response_time", None)
         current_time = time.time()
@@ -78,8 +86,9 @@ def main(context):
             context.log("Messaggio ignorato per evitare risposte duplicate.")
             return context.res.send("Ignorato: risposta già inviata di recente.")
 
+        # Costruzione prompt per Gemini
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
-        for m in sorted_messages[-10:-1]:
+        for m in reversed(sorted_messages[:10]):  # ultimi 10 in ordine corretto
             if m["from"]["id"] != page_id:
                 prompt_parts.append({"text": f"Utente: {m['message']}\n"})
         prompt_parts.append({"text": f"Utente: {user_text}\nSimone:"})
@@ -111,6 +120,7 @@ def main(context):
             context.error(f"Errore nella generazione della risposta: {str(e)}")
             reply_text = "😘"
 
+        # Limita la lunghezza della risposta
         words = reply_text.split()
         if len(words) > 20:
             reply_text = " ".join(words[:20]) + "..."
