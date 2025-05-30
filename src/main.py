@@ -58,9 +58,9 @@ def main(context):
         if not page_id:
             return context.res.send("Errore nel recupero ID pagina.")
 
-        # Ordina i messaggi per timestamp decrescente (dal più nuovo al più vecchio)
-        sorted_messages = sorted(messages, key=lambda m: m["created_time"], reverse=True)
-        last_msg = sorted_messages[0]
+        # Ordina i messaggi per timestamp crescente (dal più vecchio al più nuovo)
+        sorted_messages = sorted(messages, key=lambda m: m["created_time"])
+        last_msg = sorted_messages[-1]
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
         msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
@@ -86,12 +86,18 @@ def main(context):
             context.log("Messaggio ignorato per evitare risposte duplicate.")
             return context.res.send("Ignorato: risposta già inviata di recente.")
 
-        # Costruzione prompt per Gemini
+        # Costruzione prompt per Gemini: includi sia messaggi utente che risposte Simone
         prompt_parts = [{"text": prompt_data["system_instruction"] + "\n"}]
-        for m in reversed(sorted_messages[:10]):  # ultimi 10 in ordine corretto
-            if m["from"]["id"] != page_id:
-                prompt_parts.append({"text": f"Utente: {m['message']}\n"})
-        prompt_parts.append({"text": f"Utente: {user_text}\nSimone:"})
+
+        # Prendi gli ultimi 10 messaggi (se ce ne sono meno, prende quelli disponibili)
+        last_10 = sorted_messages[-10:]
+
+        for m in last_10:
+            role = "Simone" if m["from"]["id"] == page_id else "Utente"
+            prompt_parts.append({"text": f"{role}: {m['message']}\n"})
+
+        # Aggiungi "Simone:" per far generare la risposta dal modello
+        prompt_parts.append({"text": "Simone:"})
 
         context.log("Prompt per Gemini costruito.")
 
