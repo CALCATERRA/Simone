@@ -37,9 +37,9 @@ def main(context):
         context.log(f"TOKEN caricato: {instagram_token[:10]}...")
 
         gemini_api_key = get_rotated_gemini_key()
-if not gemini_api_key:
-    context.log("Fascia oraria non coperta da API key. Nessuna azione eseguita.")
-    return context.res.send("Orario inattivo.")
+        if not gemini_api_key:
+            context.log("Fascia oraria non coperta da API key. Nessuna azione eseguita.")
+            return context.res.send("Orario inattivo.")
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
 
