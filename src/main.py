@@ -6,18 +6,24 @@ from datetime import datetime, timezone
 import google.generativeai as genai
 
 def get_rotated_gemini_key():
-    day = datetime.now().day
-    if day <= 6:
+    now = datetime.now()
+    hour = now.hour
+
+    if 6 <= hour < 10:
         index = 1
-    elif day <= 12:
+    elif 10 <= hour < 14:
         index = 2
-    elif day <= 18:
+    elif 14 <= hour < 18:
         index = 3
-    elif day <= 24:
+    elif 18 <= hour < 22:
         index = 4
-    else:
+    elif 22 <= hour or hour < 2:
         index = 5
-    return os.environ[f"GEMINI_API_KEY_{index}"]
+    else:
+        # Tra le 2:00 e le 6:00 non usare nessuna chiave
+        return None
+
+    return os.environ.get(f"GEMINI_API_KEY_{index}")
 
 def main(context):
     try:
@@ -31,6 +37,9 @@ def main(context):
         context.log(f"TOKEN caricato: {instagram_token[:10]}...")
 
         gemini_api_key = get_rotated_gemini_key()
+if not gemini_api_key:
+    context.log("Fascia oraria non coperta da API key. Nessuna azione eseguita.")
+    return context.res.send("Orario inattivo.")
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
 
