@@ -35,7 +35,7 @@ def main(context):
         model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
 
         # Recupera i messaggi recenti
-        convo_url = "https://graph.instagram.com/v18.0/me/conversations"
+        convo_url = "https://graph.instagram.com/v18.0/30557470100518977/conversations"
         convo_params = {"fields": "messages{message,from,id,created_time}", "access_token": instagram_token}
         convo_res = requests.get(convo_url, params=convo_params)
         context.log(f"Richiesta conversazioni: {convo_res.status_code}")
@@ -51,7 +51,7 @@ def main(context):
             return context.res.send("Nessun messaggio utile.")
 
         # Evita loop rispondendo a sé stesso
-        page_info_url = "https://graph.instagram.com/me"
+        page_info_url = "https://graph.instagram.com/30557470100518977"
         page_info_params = {"fields": "id", "access_token": instagram_token}
         page_id = requests.get(page_info_url, params=page_info_params).json().get("id")
         context.log(f"ID pagina: {page_id}")
@@ -134,7 +134,7 @@ def main(context):
         context.log(f"Risposta finale: {reply_text}")
 
         # Invio risposta a Instagram
-        send_url = "https://graph.instagram.com/v18.0/me/messages"
+        send_url = "https://graph.instagram.com/v18.0/30557470100518977/messages"
         send_payload = {"recipient": {"id": user_id}, "message": {"text": reply_text}}
         send_headers = {"Content-Type": "application/json"}
         send_params = {"access_token": instagram_token}
