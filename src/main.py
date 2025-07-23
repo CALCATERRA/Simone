@@ -75,7 +75,7 @@ def main(context):
         msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
 
         # ✅ Blocca messaggi generati da sé stesso
-        if user_id == 17841464183957073:
+        if user_id == "17841464183957073":
             context.log("Messaggio inviato da me stesso, ignorato.")
             return context.res.send("Messaggio interno ignorato.")
 
