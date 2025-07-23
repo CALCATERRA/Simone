@@ -73,6 +73,12 @@ def main(context):
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
         msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
+
+        # ✅ Blocca messaggi generati da sé stesso
+        if user_id == page_id:
+            context.log("Messaggio inviato da me stesso, ignorato.")
+            return context.res.send("Messaggio interno ignorato.")
+
         # 🚫 Blocca messaggi già visti
         processed_ids = getattr(context, "processed_ids", set())
         if last_msg["id"] in processed_ids:
@@ -88,9 +94,6 @@ def main(context):
         diff_sec = (now - msg_time).total_seconds()
         context.log(f"Adesso è: {now}")
         context.log(f"Differenza in secondi: {diff_sec}")
-
-        if user_id == page_id:
-            return context.res.send("Messaggio interno ignorato.")
 
         # 🔧 Disattiva temporaneamente il filtro tempo per debugging
         if diff_sec < 5:
