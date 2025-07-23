@@ -41,7 +41,7 @@ def main(context):
             context.log("Fascia oraria non coperta da API key. Nessuna azione eseguita.")
             return context.res.send("Orario inattivo.")
         genai.configure(api_key=gemini_api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         # Recupera i messaggi recenti
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
