@@ -73,6 +73,14 @@ def main(context):
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
         msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
+        # 🚫 Blocca messaggi già visti
+        processed_ids = getattr(context, "processed_ids", set())
+        if last_msg["id"] in processed_ids:
+            context.log("Messaggio già gestito, ignorato.")
+            return context.res.send("Duplicato ignorato.")
+        else:
+            processed_ids.add(last_msg["id"])
+            context.processed_ids = processed_ids
 
         context.log(f"Ultimo messaggio da {user_id}: {user_text}")
         context.log(f"Timestamp messaggio: {msg_time}")
