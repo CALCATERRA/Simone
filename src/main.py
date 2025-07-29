@@ -148,8 +148,8 @@ def main(context):
 
         # Limita la lunghezza della risposta
         words = reply_text.split()
-        if len(words) > 20:
-            reply_text = " ".join(words[:20]) + "..."
+        if len(words) > 60:
+            reply_text = " ".join(words[:60]) + "..."
 
         context.log(f"Risposta finale: {reply_text}")
 
