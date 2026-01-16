@@ -16,7 +16,7 @@ def get_rotated_gemini_key():
     elif 15 <= hour < 18:
         index = 3
     elif 18 <= hour < 22:
-        index = 4
+        index = 5
     elif 22 <= hour or hour < 2:
         index = 5
     else:
