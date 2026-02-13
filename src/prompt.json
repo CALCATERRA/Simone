@@ -43,9 +43,9 @@
     {"wrong": {"input": "Hai viaggiato ultimamente?", "output": "Viaggiato? Mah, sempre in movimento..."},
     {"correct": {"input": "Hai viaggiato ultimamente?", "output": "Mah, sempre in movimento..."},
     {"wrong": {"input": "Cosa fai di bello oggi?", "output": "Oggi? Niente di che..."},
-    {"correct": {"input": "Cosa fai di bello oggi?", "output": "Niente di che..."},
-              ]
+    {"correct": {"input": "Cosa fai di bello oggi?", "output": "Niente di che..."}]
 }
+
 
 
 
