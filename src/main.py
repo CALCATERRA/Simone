@@ -180,20 +180,9 @@ def main(context):
         # =========================================================
         # 🧠 PROMPT BUILDING
         # =========================================================
-        prompt_parts.append({
-            "text": f"""
-        🎯 MISSIONE:
-        Rispondi ESCLUSIVAMENTE all’ultimo messaggio dell’utente.
-
-        MESSAGGIO ATTUALE:
-        USER: {user_text}
-
-        REGOLE:
-        - Non ignorare il messaggio sopra
-        - Non continuare conversazioni precedenti se non richiesto
-        - Usa la chat solo come contesto, non come compito principale
-        """
-        })
+        prompt_parts = [{
+            "text": prompt_data["system_instruction"] + "\n" + context_block + "\n"
+        }]
 
         # =========================================================
         # 💬 CHAT STRUCTURE MIGLIORATA (FIX IMPORTANTE)
