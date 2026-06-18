@@ -199,7 +199,20 @@ def main(context):
 
         prompt_parts.append({"text": chat_block})
 
-        prompt_parts.append({"text": "ASSISTANT:"})
+        prompt_parts.append({
+            "text": f"""
+        🎯 MISSIONE:
+        Rispondi ESCLUSIVAMENTE all’ultimo messaggio dell’utente.
+        
+        MESSAGGIO ATTUALE:
+        USER: {user_text}
+        
+        REGOLE:
+        - Non ignorare il messaggio sopra
+        - Non continuare conversazioni precedenti se non richiesto
+        - Usa la chat solo come contesto, non come compito principale
+        """
+        })
 
         # =========================================================
         # 🤖 GENERAZIONE RISPOSTA
