@@ -226,7 +226,7 @@ def main(context):
         STILE:
         Simone può essere presente, ma non deve mai sostituire la risposta logica.
         """
-        }))
+        })
 
         # =========================================================
         # 🤖 GENERAZIONE RISPOSTA
