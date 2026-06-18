@@ -7,11 +7,11 @@ import google.generativeai as genai
 
 
 # =========================================================
-# 🌤️ CONTEXT ENGINE: METEO (NUOVO)
+# 🌤️ CONTEXT ENGINE: METEO (INVARIATO)
 # =========================================================
 def get_weather(city):
     try:
-        api_key = os.environ.get("OPENWEATHER_API_KEY")  # 🔴 NUOVA VARIABILE
+        api_key = os.environ.get("OPENWEATHER_API_KEY")
         if not api_key:
             return None
 
@@ -39,7 +39,7 @@ def get_weather(city):
 
 
 # =========================================================
-# 🔁 ROTAZIONE GEMINI KEYS (TUO CODICE INVARIATO)
+# 🔁 ROTAZIONE GEMINI KEYS (INVARIATO)
 # =========================================================
 def get_rotated_gemini_key():
     now = datetime.now()
@@ -77,8 +77,15 @@ def main(context):
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
 
+        # =========================================================
+        # 📩 RECUPERO CONVERSAZIONI
+        # =========================================================
         convo_url = "https://graph.instagram.com/v18.0/me/conversations"
-        convo_params = {"fields": "messages{message,from,id,created_time}", "access_token": instagram_token}
+        convo_params = {
+            "fields": "messages{message,from,id,created_time}",
+            "access_token": instagram_token
+        }
+
         convo_res = requests.get(convo_url, params=convo_params)
         convo_data = convo_res.json()
 
@@ -87,8 +94,14 @@ def main(context):
 
         last_convo = convo_data["data"][0]
         messages = last_convo.get("messages", {}).get("data", [])
+
         if not messages:
             return context.res.send("Nessun messaggio utile.")
+
+        # =========================================================
+        # 🧠 ORDINE SICURO MESSAGGI
+        # =========================================================
+        sorted_messages = sorted(messages, key=lambda m: m["created_time"])
 
         page_info_url = "https://graph.instagram.com/me"
         page_info_params = {"fields": "id", "access_token": instagram_token}
@@ -97,24 +110,37 @@ def main(context):
         if not page_id:
             return context.res.send("Errore ID pagina.")
 
-        sorted_messages = sorted(messages, key=lambda m: m["created_time"])
         last_msg = sorted_messages[-1]
 
         user_id = last_msg["from"]["id"]
         user_text = last_msg["message"]
-        msg_time = datetime.fromisoformat(last_msg["created_time"].replace("Z", "+00:00"))
 
-        # 🚫 SELF CHECK
-        if user_id == "17841464183957073":
+        msg_time = datetime.fromisoformat(
+            last_msg["created_time"].replace("Z", "+00:00")
+        )
+
+        # =========================================================
+        # 🚫 SELF MESSAGE CHECK
+        # =========================================================
+        if user_id == page_id:
             return context.res.send("Ignorato self message.")
 
-        # 🚫 DUPLICATI
+        # =========================================================
+        # 🚫 DEDUPLICAZIONE ROBUSTA
+        # =========================================================
         processed_ids = getattr(context, "processed_ids", set())
-        if last_msg["id"] in processed_ids:
+
+        message_id = last_msg["id"]
+
+        if message_id in processed_ids:
             return context.res.send("Duplicato ignorato.")
-        processed_ids.add(last_msg["id"])
+
+        processed_ids.add(message_id)
         context.processed_ids = processed_ids
 
+        # =========================================================
+        # ⏱️ TIMING
+        # =========================================================
         now = datetime.now(timezone.utc)
         diff_sec = (now - msg_time).total_seconds()
 
@@ -122,21 +148,22 @@ def main(context):
             context.log("Messaggio troppo recente.")
 
         # =========================================================
-        # 🧠 CONTEXT ENGINE INTELLIGENTE (NUOVO)
+        # 🧠 CONTEXT ENGINE
         # =========================================================
-
         context_block = f"""
 📅 Data: {now.strftime('%d/%m/%Y')}
 🕒 Ora: {now.strftime('%H:%M')}
 """
 
-        # 🔵 METEO SOLO SE SERVE (OTTIMIZZAZIONE IMPORTANTE)
+        # =========================================================
+        # 🌤️ METEO INTELLIGENTE (solo se serve)
+        # =========================================================
         trigger_words = [
-            "meteo", "pioggia", "sole", "tempo", "temperature",
-            "domani", "oggi", "uscire", "uscita", "evento", "viaggio"
+            "meteo", "pioggia", "sole", "tempo",
+            "domani", "oggi", "uscire", "evento", "viaggio"
         ]
 
-        include_weather = any(word in user_text.lower() for word in trigger_words)
+        include_weather = any(w in user_text.lower() for w in trigger_words)
 
         if include_weather:
             cities = ["Verona", "Padova", "Milano"]
@@ -153,19 +180,30 @@ def main(context):
         # =========================================================
         # 🧠 PROMPT BUILDING
         # =========================================================
-
         prompt_parts = [{
             "text": prompt_data["system_instruction"] + "\n" + context_block + "\n"
         }]
 
+        # =========================================================
+        # 💬 CHAT STRUCTURE MIGLIORATA (FIX IMPORTANTE)
+        # =========================================================
         last_10 = sorted_messages[-10:]
 
+        chat_block = "\nCONVERSAZIONE RECENTE:\n"
+
         for m in last_10:
-            role = "Simone" if m["from"]["id"] == page_id else "Utente"
-            prompt_parts.append({"text": f"{role}: {m['message']}\n"})
+            role = "ASSISTANT" if m["from"]["id"] == page_id else "USER"
+            chat_block += f"{role}: {m['message']}\n"
 
-        prompt_parts.append({"text": "Simone:"})
+        chat_block += "\nRispondi in modo coerente all'ultimo messaggio dell'utente mantenendo il contesto della conversazione.\n"
 
+        prompt_parts.append({"text": chat_block})
+
+        prompt_parts.append({"text": "ASSISTANT:"})
+
+        # =========================================================
+        # 🤖 GENERAZIONE RISPOSTA
+        # =========================================================
         try:
             response = model.generate_content(
                 prompt_parts,
@@ -186,10 +224,15 @@ def main(context):
             context.error(str(e))
             reply_text = "😘"
 
-        # LIMITE RISPOSTA
+        # =========================================================
+        # ✂️ LIMITAZIONE RISPOSTA
+        # =========================================================
         if len(reply_text.split()) > 60:
             reply_text = " ".join(reply_text.split()[:60]) + "..."
 
+        # =========================================================
+        # 📤 INVIO INSTAGRAM
+        # =========================================================
         send_url = "https://graph.instagram.com/v18.0/me/messages"
         send_payload = {
             "recipient": {"id": user_id},
