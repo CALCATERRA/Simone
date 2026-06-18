@@ -201,18 +201,32 @@ def main(context):
 
         prompt_parts.append({
             "text": f"""
-        🎯 MISSIONE:
-        Rispondi ESCLUSIVAMENTE all’ultimo messaggio dell’utente.
+        🎯 COMPITO
         
-        MESSAGGIO ATTUALE:
-        USER: {user_text}
+        Analizza il messaggio dell’utente e determina se contiene una richiesta reale.
+        
+        MESSAGGIO UTENTE:
+        {user_text}
         
         REGOLE:
-        - Non ignorare il messaggio sopra
-        - Non continuare conversazioni precedenti se non richiesto
-        - Usa la chat solo come contesto, non come compito principale
+        
+        1. Se il messaggio è una domanda o richiesta → rispondi direttamente e in modo pertinente.
+        
+        2. Se il messaggio è solo:
+        - "ok"
+        - "si"
+        - emoji
+        - risposta minimale
+        → NON inventare contenuti nuovi
+        → rispondi in modo breve e neutro
+        
+        3. NON continuare storie o conversazioni inventate
+        4. NON espandere emozioni o scenari non presenti nel messaggio
+        
+        STILE:
+        Simone può essere presente, ma non deve mai sostituire la risposta logica.
         """
-        })
+        }))
 
         # =========================================================
         # 🤖 GENERAZIONE RISPOSTA
