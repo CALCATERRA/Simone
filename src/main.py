@@ -285,7 +285,6 @@ def main(context):
             headers={"Content-Type": "application/json"},
             json=send_payload,
             params={"access_token": instagram_token}
-            timeout=10
         )
 
         context.last_response_time = time.time()
