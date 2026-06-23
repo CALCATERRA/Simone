@@ -23,7 +23,11 @@ def get_weather(city):
             "lang": "it"
         }
 
-        res = requests.get(url, params=params)
+        res = requests.get(
+        url,
+        params=params,
+        timeout=5
+    )
         data = res.json()
 
         if res.status_code != 200:
@@ -86,7 +90,11 @@ def main(context):
             "access_token": instagram_token
         }
 
-        convo_res = requests.get(convo_url, params=convo_params)
+        convo_res = requests.get(
+            convo_url,
+            params=convo_params,
+            timeout=10
+        )
         convo_data = convo_res.json()
 
         if "data" not in convo_data or not convo_data["data"]:
@@ -105,7 +113,11 @@ def main(context):
 
         page_info_url = "https://graph.instagram.com/me"
         page_info_params = {"fields": "id", "access_token": instagram_token}
-        page_id = requests.get(page_info_url, params=page_info_params).json().get("id")
+        page_id = requests.get(
+            page_info_url,
+            params=page_info_params,
+            timeout=10
+        ).json().get("id")
 
         if not page_id:
             return context.res.send("Errore ID pagina.")
@@ -232,15 +244,17 @@ def main(context):
         # 🤖 GENERAZIONE RISPOSTA
         # =========================================================
         try:
+            context.log("PRIMA DI GEMINI")
             response = model.generate_content(
                 prompt_parts,
                 generation_config={
                     "temperature": 0.7,
-                    "max_output_tokens": 65536,
+                    "max_output_tokens": 120,
                     "top_k": 64,
                     "top_p": 0.95
                 }
             )
+            context.log("DOPO GEMINI")
 
             if not response.candidates or not response.text:
                 raise ValueError("No response")
@@ -271,6 +285,7 @@ def main(context):
             headers={"Content-Type": "application/json"},
             json=send_payload,
             params={"access_token": instagram_token}
+            timeout=10
         )
 
         context.last_response_time = time.time()
