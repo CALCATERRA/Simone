@@ -1,0 +1,12 @@
+name = "simone"
+main = "src/main.py"
+compatibility_date = "2026-09-17"
+compatibility_flags = ["python_workers"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "simone-memory"
+database_id = "11f7c6bb-f1c3-4051-a1b4-b112f1faad09"
+
+[observability]
+enabled = true
