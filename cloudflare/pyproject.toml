@@ -3,10 +3,10 @@ name = "simone-cloudflare"
 version = "0.1.0"
 description = "Simone Instagram chatbot running on Cloudflare Workers"
 requires-python = ">=3.13"
-dependencies = []
-
-[dependency-groups]
-dev = [
-    "workers-py",
+dependencies = [
+    "workers-py>=1.9",
     "workers-runtime-sdk",
 ]
+
+[dependency-groups]
+dev = []
