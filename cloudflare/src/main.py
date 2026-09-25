@@ -341,6 +341,14 @@ class Default(WorkerEntrypoint):
             print("Funzione avviata")
 
             # =========================================================
+            # 🌐 HEALTH CHECK WORKER
+            # =========================================================
+            if request.method == "GET":
+                return Response(
+                    "Simone Worker OK"
+                )
+
+            # =========================================================
             # 🔐 RECUPERO SECRET
             # =========================================================
             instagram_token = self.env.INSTAGRAM_TOKEN
