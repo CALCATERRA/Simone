@@ -666,13 +666,14 @@ async def process_instagram_message(
     # =====================================================
     # 🧠 CRONOLOGIA D1
     # =====================================================
-    recent_messages = (
-        await get_recent_messages(
-            worker.env.DB,
-            user_id,
-            10
-        )
-    )
+recent_messages = await get_recent_messages(
+    worker.env.DB, user_id, 10
+)
+
+persistent_memory = await get_memory(
+    worker.env.DB, user_id
+)
+
 
     # =====================================================
     # 🧠 PROMPT
@@ -690,6 +691,22 @@ async def process_instagram_message(
                 + "\n"
         }
     ]
+
+memory_block = "\nMEMORIA PERSISTENTE DELL'UTENTE:\n"
+
+if persistent_memory:
+    for memory in persistent_memory:
+        memory_block += (
+            f"- [{memory['memory_type']}] "
+            f"{memory['memory_key']}: "
+            f"{memory['memory_value']}\n"
+        )
+else:
+    memory_block += "- Nessuna memoria persistente disponibile.\n"
+
+prompt_parts.append({
+    "text": memory_block
+})
 
     # =====================================================
     # 💬 CONVERSAZIONE RECENTE
