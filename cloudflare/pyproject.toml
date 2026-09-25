@@ -13,3 +13,4 @@ dev = [
 
 [tool.pywrangler.assets]
 "src/prompt.json" = "prompt.json"
+
