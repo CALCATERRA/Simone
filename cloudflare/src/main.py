@@ -53,11 +53,11 @@ def get_rotated_gemini_key(env):
     elif 10 <= hour < 15:
         index = 2
     elif 15 <= hour < 18:
-        index = 1
+        index = 3
     elif 18 <= hour < 22:
-        index = 1
+        index = 4
     elif 22 <= hour or hour < 2:
-        index = 1
+        index = 5
     else:
         return None
 
@@ -115,7 +115,7 @@ async def generate_gemini_response(api_key, prompt_parts):
     headers.set("Content-Type", "application/json")
     headers.set("x-goog-api-key", api_key)
 
-    delays = [0, 1, 2]
+    delays = [0, 1, 2, 4, 8]
 
     for attempt, delay in enumerate(delays, start=1):
         if delay:
@@ -168,15 +168,14 @@ async def generate_gemini_response(api_key, prompt_parts):
 
         print(
             f"Gemini HTTP {response.status}, "
-            f"tentativo {attempt}/3"
+            f"tentativo {attempt}/5"
         )
 
-        if attempt == 3:
+        if attempt == 5:
             raise RuntimeError(
                 f"Gemini HTTP {response.status}: "
                 f"{error_text}"
             )
-
 # =========================================================
 # 🚫 DEDUPLICAZIONE PERSISTENTE D1
 # =========================================================
