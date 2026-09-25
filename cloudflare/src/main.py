@@ -209,9 +209,9 @@ async def get_instagram_page_id(instagram_token):
 async def is_message_processed(db, message_id):
     result = await db.prepare(
         """
-        SELECT message_id
+        SELECT instagram_message_id
         FROM processed_messages
-        WHERE message_id = ?
+        WHERE instagram_message_id = ?
         LIMIT 1
         """
     ).bind(message_id).run()
@@ -222,7 +222,7 @@ async def is_message_processed(db, message_id):
 async def mark_message_processed(db, message_id):
     await db.prepare(
         """
-        INSERT OR IGNORE INTO processed_messages (message_id)
+        INSERT OR IGNORE INTO processed_messages (instagram_message_id)
         VALUES (?)
         """
     ).bind(message_id).run()
@@ -273,7 +273,7 @@ async def save_user(
             VALUES (?)
             ON CONFLICT(instagram_user_id)
             DO UPDATE SET
-                updated_at = CURRENT_TIMESTAMP
+                last_seen = CURRENT_TIMESTAMP
             """
         ).bind(
             instagram_user_id
