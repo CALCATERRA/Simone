@@ -57,7 +57,7 @@ def get_rotated_gemini_key(env):
     elif 15 <= hour < 18:
         index = 3
     elif 18 <= hour < 22:
-        index = 5
+        index = 4
     elif 22 <= hour or hour < 2:
         index = 5
     else:
@@ -233,6 +233,7 @@ async def mark_message_processed(db, message_id):
 # =========================================================
 async def save_message(
     db,
+    instagram_message_id,
     instagram_user_id,
     role,
     content
@@ -241,18 +242,19 @@ async def save_message(
         await db.prepare(
             """
             INSERT INTO messages (
+                instagram_message_id,
                 instagram_user_id,
                 role,
                 content
             )
-            VALUES (?, ?, ?)
+            VALUES (?, ?, ?, ?)
             """
         ).bind(
+            instagram_message_id,
             instagram_user_id,
             role,
             content
         ).run()
-
     except Exception as error:
         print(f"D1 save message error: {error}")
 
@@ -670,6 +672,7 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
 
                 await save_message(
                     self.env.DB,
+                    last_msg["id"],
                     user_id,
                     "user",
                     user_text
@@ -677,6 +680,7 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
 
                 await save_message(
                     self.env.DB,
+                    last_msg["id"],
                     user_id,
                     "assistant",
                     reply_text
