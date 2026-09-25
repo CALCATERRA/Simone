@@ -90,10 +90,7 @@ async def load_prompt(env):
 # =========================================================
 # 🤖 GEMINI HTTP API
 # =========================================================
-async def generate_gemini_response(
-    api_key,
-    prompt_parts
-):
+async def generate_gemini_response(api_key, prompt_parts):
     url = (
         "https://generativelanguage.googleapis.com/"
         "v1beta/models/gemini-3.1-flash-lite-preview:"
@@ -115,72 +112,70 @@ async def generate_gemini_response(
     }
 
     headers = Headers.new()
-    headers.set(
-        "Content-Type",
-        "application/json"
-    )
-    headers.set(
-        "x-goog-api-key",
-        api_key
-    )
+    headers.set("Content-Type", "application/json")
+    headers.set("x-goog-api-key", api_key)
 
-    response = await fetch(
-        url,
-        {
-            "method": "POST",
-            "headers": headers,
-            "body": json.dumps(payload)
-        }
-    )
+    delays = [0, 1, 2]
 
-    if not response.ok:
+    for attempt, delay in enumerate(delays, start=1):
+        if delay:
+            await __import__("asyncio").sleep(delay)
+
+        response = await fetch(
+            url,
+            {
+                "method": "POST",
+                "headers": headers,
+                "body": json.dumps(payload)
+            }
+        )
+
+        if response.ok:
+            data = await response.json()
+            data = data.to_py()
+
+            candidates = data.get("candidates", [])
+            if not candidates:
+                raise ValueError("No response candidates")
+
+            parts = (
+                candidates[0]
+                .get("content", {})
+                .get("parts", [])
+            )
+            if not parts:
+                raise ValueError("No response parts")
+
+            text_parts = []
+            for part in parts:
+                if "text" in part:
+                    text_parts.append(part["text"])
+
+            reply_text = "".join(text_parts).strip()
+
+            if not reply_text:
+                raise ValueError("Empty Gemini response")
+
+            return reply_text
+
         error_text = await response.text()
 
-        raise RuntimeError(
-            f"Gemini HTTP {response.status}: "
-            f"{error_text}"
-        )
-
-    data = await response.json()
-    data = data.to_py()
-
-    candidates = data.get("candidates", [])
-
-    if not candidates:
-        raise ValueError(
-            "No response candidates"
-        )
-
-    parts = (
-        candidates[0]
-        .get("content", {})
-        .get("parts", [])
-    )
-
-    if not parts:
-        raise ValueError(
-            "No response parts"
-        )
-
-    text_parts = []
-
-    for part in parts:
-        if "text" in part:
-            text_parts.append(
-                part["text"]
+        if response.status not in (429, 500, 502, 503, 504):
+            raise RuntimeError(
+                f"Gemini HTTP {response.status}: "
+                f"{error_text}"
             )
 
-    reply_text = "".join(
-        text_parts
-    ).strip()
-
-    if not reply_text:
-        raise ValueError(
-            "Empty Gemini response"
+        print(
+            f"Gemini HTTP {response.status}, "
+            f"tentativo {attempt}/3"
         )
 
-    return reply_text
-
+        if attempt == 3:
+            raise RuntimeError(
+                f"Gemini HTTP {response.status}: "
+                f"{error_text}"
+            )
 
 # =========================================================
 # 🚫 DEDUPLICAZIONE PERSISTENTE D1
