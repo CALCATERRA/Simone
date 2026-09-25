@@ -680,7 +680,7 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
 
                 await save_message(
                     self.env.DB,
-                    last_msg["id"],
+                    str(time.time_ns()),
                     user_id,
                     "assistant",
                     reply_text
