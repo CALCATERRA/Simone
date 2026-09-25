@@ -80,7 +80,7 @@ async def load_prompt(env):
         )
 
     data = await response.json()
-    return data.to_py()
+    return data
 
 
 # =========================================================
