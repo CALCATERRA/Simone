@@ -274,6 +274,52 @@ async def save_user(
             f"D1 save user error: {error}"
         )
 
+async def save_memory(
+    db,
+    instagram_user_id,
+    memory_type,
+    memory_key,
+    memory_value
+):
+    try:
+        await db.prepare(
+            """
+            INSERT INTO memory (
+                instagram_user_id,
+                memory_type,
+                memory_key,
+                memory_value
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(instagram_user_id, memory_type, memory_key)
+            DO UPDATE SET
+                memory_value = excluded.memory_value,
+                updated_at = CURRENT_TIMESTAMP
+            """
+        ).bind(
+            instagram_user_id,
+            memory_type,
+            memory_key,
+            memory_value
+        ).run()
+    except Exception as error:
+        print(f"D1 save memory error: {error}")
+
+async def get_memory(db, instagram_user_id):
+    try:
+        result = await db.prepare(
+            """
+            SELECT memory_type, memory_key, memory_value
+            FROM memory
+            WHERE instagram_user_id = ?
+            ORDER BY updated_at ASC
+            """
+        ).bind(instagram_user_id).run()
+
+        return list(result.results)
+
+    except Exception as error:
+        print(f"D1 memory error: {error}")
 
 # =========================================================
 # 🧠 RECUPERO CRONOLOGIA DA D1
