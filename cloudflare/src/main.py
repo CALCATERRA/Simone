@@ -864,8 +864,7 @@ class Default(WorkerEntrypoint):
             ):
 
                 payload = await request.json()
-                payload = payload.to_py()
-
+                
                 print(
                     "Webhook Instagram ricevuto"
                 )
