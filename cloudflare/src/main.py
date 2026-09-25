@@ -69,11 +69,18 @@ def get_rotated_gemini_key(env):
 # =========================================================
 # 📄 CARICAMENTO PROMPT
 # =========================================================
-def load_prompt():
-    prompt_path = Path(__file__).parent / "prompt.json"
+async def load_prompt(env):
+    response = await env.ASSETS.fetch(
+        "https://assets/prompt.json"
+    )
 
-    with open(prompt_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    if not response.ok:
+        raise RuntimeError(
+            f"Impossibile caricare prompt.json: HTTP {response.status}"
+        )
+
+    data = await response.json()
+    return data.to_py()
 
 
 # =========================================================
@@ -356,7 +363,7 @@ class Default(WorkerEntrypoint):
             # =========================================================
             # 📄 CARICAMENTO PROMPT
             # =========================================================
-            prompt_data = load_prompt()
+            prompt_data = await load_prompt(self.env)
 
             # =========================================================
             # 🔁 ROTAZIONE GEMINI
