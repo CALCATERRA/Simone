@@ -10,7 +10,3 @@ dev = [
     "workers-py",
     "workers-runtime-sdk",
 ]
-
-[tool.pywrangler.assets]
-"src/prompt.json" = "prompt.json"
-
