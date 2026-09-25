@@ -1,16 +1,15 @@
+```python
 from workers import WorkerEntrypoint, Response
 
 from datetime import datetime, timezone
-from pathlib import Path
 import json
 import time
 
 from js import fetch, Headers
-from pyodide.ffi import to_js
 
 
 # =========================================================
-# 🌤️ CONTEXT ENGINE: METEO (INVARIATO)
+# 🌤️ CONTEXT ENGINE: METEO
 # =========================================================
 async def get_weather(api_key, city):
     try:
@@ -44,7 +43,7 @@ async def get_weather(api_key, city):
 
 
 # =========================================================
-# 🔁 ROTAZIONE GEMINI KEYS (INVARIATO)
+# 🔁 ROTAZIONE GEMINI KEYS
 # =========================================================
 def get_rotated_gemini_key(env):
     now = datetime.now()
@@ -63,7 +62,11 @@ def get_rotated_gemini_key(env):
     else:
         return None
 
-    return getattr(env, f"GEMINI_API_KEY_{index}", None)
+    return getattr(
+        env,
+        f"GEMINI_API_KEY_{index}",
+        None
+    )
 
 
 # =========================================================
@@ -76,10 +79,12 @@ async def load_prompt(env):
 
     if not response.ok:
         raise RuntimeError(
-            f"Impossibile caricare prompt.json: HTTP {response.status}"
+            f"Impossibile caricare prompt.json: "
+            f"HTTP {response.status}"
         )
 
     data = await response.json()
+
     return data
 
 
@@ -92,7 +97,8 @@ async def generate_gemini_response(
 ):
     url = (
         "https://generativelanguage.googleapis.com/"
-        "v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
+        "v1beta/models/gemini-3.1-flash-lite-preview:"
+        "generateContent"
     )
 
     payload = {
@@ -110,8 +116,14 @@ async def generate_gemini_response(
     }
 
     headers = Headers.new()
-    headers.set("Content-Type", "application/json")
-    headers.set("x-goog-api-key", api_key)
+    headers.set(
+        "Content-Type",
+        "application/json"
+    )
+    headers.set(
+        "x-goog-api-key",
+        api_key
+    )
 
     response = await fetch(
         url,
@@ -124,8 +136,10 @@ async def generate_gemini_response(
 
     if not response.ok:
         error_text = await response.text()
+
         raise RuntimeError(
-            f"Gemini HTTP {response.status}: {error_text}"
+            f"Gemini HTTP {response.status}: "
+            f"{error_text}"
         )
 
     data = await response.json()
@@ -134,79 +148,48 @@ async def generate_gemini_response(
     candidates = data.get("candidates", [])
 
     if not candidates:
-        raise ValueError("No response candidates")
+        raise ValueError(
+            "No response candidates"
+        )
 
-    parts = candidates[0].get("content", {}).get("parts", [])
+    parts = (
+        candidates[0]
+        .get("content", {})
+        .get("parts", [])
+    )
 
     if not parts:
-        raise ValueError("No response parts")
+        raise ValueError(
+            "No response parts"
+        )
 
     text_parts = []
 
     for part in parts:
         if "text" in part:
-            text_parts.append(part["text"])
+            text_parts.append(
+                part["text"]
+            )
 
-    reply_text = "".join(text_parts).strip()
+    reply_text = "".join(
+        text_parts
+    ).strip()
 
     if not reply_text:
-        raise ValueError("Empty Gemini response")
+        raise ValueError(
+            "Empty Gemini response"
+        )
 
     return reply_text
 
 
 # =========================================================
-# 📩 RECUPERO CONVERSAZIONI INSTAGRAM
-# =========================================================
-async def get_instagram_conversations(instagram_token):
-    convo_url = "https://graph.instagram.com/v18.0/me/conversations"
-
-    url = (
-        f"{convo_url}"
-        "?fields=messages{message,from,id,created_time}"
-        f"&access_token={instagram_token}"
-    )
-
-    response = await fetch(url)
-
-    if not response.ok:
-        error_text = await response.text()
-        raise RuntimeError(
-            f"Instagram conversations HTTP "
-            f"{response.status}: {error_text}"
-        )
-
-    return (await response.json()).to_py()
-
-
-# =========================================================
-# 🆔 RECUPERO ID PAGINA INSTAGRAM
-# =========================================================
-async def get_instagram_page_id(instagram_token):
-    url = (
-        "https://graph.instagram.com/me"
-        "?fields=id"
-        f"&access_token={instagram_token}"
-    )
-
-    response = await fetch(url)
-
-    if not response.ok:
-        error_text = await response.text()
-        raise RuntimeError(
-            f"Instagram page ID HTTP "
-            f"{response.status}: {error_text}"
-        )
-
-    data = (await response.json()).to_py()
-
-    return data.get("id")
-
-
-# =========================================================
 # 🚫 DEDUPLICAZIONE PERSISTENTE D1
 # =========================================================
-async def is_message_processed(db, message_id):
+async def is_message_processed(
+    db,
+    message_id
+):
     result = await db.prepare(
         """
         SELECT instagram_message_id
@@ -214,18 +197,27 @@ async def is_message_processed(db, message_id):
         WHERE instagram_message_id = ?
         LIMIT 1
         """
-    ).bind(message_id).run()
+    ).bind(
+        message_id
+    ).run()
 
     return bool(result.results)
 
 
-async def mark_message_processed(db, message_id):
+async def mark_message_processed(
+    db,
+    message_id
+):
     await db.prepare(
         """
-        INSERT OR IGNORE INTO processed_messages (instagram_message_id)
+        INSERT OR IGNORE INTO processed_messages (
+            instagram_message_id
+        )
         VALUES (?)
         """
-    ).bind(message_id).run()
+    ).bind(
+        message_id
+    ).run()
 
 
 # =========================================================
@@ -255,8 +247,11 @@ async def save_message(
             role,
             content
         ).run()
+
     except Exception as error:
-        print(f"D1 save message error: {error}")
+        print(
+            f"D1 save message error: {error}"
+        )
 
 
 # =========================================================
@@ -282,7 +277,45 @@ async def save_user(
         ).run()
 
     except Exception as error:
-        print(f"D1 save user error: {error}")
+        print(
+            f"D1 save user error: {error}"
+        )
+
+
+# =========================================================
+# 🧠 RECUPERO CRONOLOGIA DA D1
+# =========================================================
+async def get_recent_messages(
+    db,
+    instagram_user_id,
+    limit=10
+):
+    try:
+        result = await db.prepare(
+            """
+            SELECT role, content, created_at
+            FROM messages
+            WHERE instagram_user_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """
+        ).bind(
+            instagram_user_id,
+            limit
+        ).run()
+
+        messages = list(result.results)
+
+        messages.reverse()
+
+        return messages
+
+    except Exception as error:
+        print(
+            f"D1 history error: {error}"
+        )
+
+        return []
 
 
 # =========================================================
@@ -293,7 +326,9 @@ async def send_instagram_message(
     user_id,
     reply_text
 ):
-    send_url = "https://graph.instagram.com/v18.0/me/messages"
+    send_url = (
+        "https://graph.instagram.com/v18.0/me/messages"
+    )
 
     payload = {
         "recipient": {
@@ -305,7 +340,10 @@ async def send_instagram_message(
     }
 
     headers = Headers.new()
-    headers.set("Content-Type", "application/json")
+    headers.set(
+        "Content-Type",
+        "application/json"
+    )
 
     url = (
         f"{send_url}"
@@ -331,286 +369,333 @@ async def send_instagram_message(
 
 
 # =========================================================
-# 🤖 MAIN WORKER
+# 🔐 WEBHOOK VERIFICATION
 # =========================================================
-class Default(WorkerEntrypoint):
+async def handle_webhook_verification(
+    request,
+    env
+):
+    url = request.url
 
-    async def fetch(self, request):
+    query_string = ""
 
-        try:
-            print("Funzione avviata")
+    if "?" in url:
+        query_string = url.split("?", 1)[1]
 
-            # =========================================================
-            # 🌐 HEALTH CHECK WORKER
-            # =========================================================
-            if request.method == "GET":
-                return Response(
-                    "Simone Worker OK"
-                )
+    params = {}
 
-            # =========================================================
-            # 🔐 RECUPERO SECRET
-            # =========================================================
-            instagram_token = self.env.INSTAGRAM_TOKEN
+    for item in query_string.split("&"):
+        if "=" in item:
+            key, value = item.split("=", 1)
+            params[key] = value
 
-            openweather_api_key = getattr(
-                self.env,
-                "OPENWEATHER_API_KEY",
-                None
+    mode = params.get("hub.mode")
+    verify_token = params.get(
+        "hub.verify_token"
+    )
+    challenge = params.get(
+        "hub.challenge"
+    )
+
+    expected_token = getattr(
+        env,
+        "META_VERIFY_TOKEN",
+        None
+    )
+
+    if (
+        mode == "subscribe"
+        and verify_token
+        and expected_token
+        and verify_token == expected_token
+        and challenge
+    ):
+        print(
+            "Webhook Meta verificato correttamente"
+        )
+
+        return Response(
+            challenge,
+            status=200
+        )
+
+    print(
+        "Verifica webhook Meta fallita"
+    )
+
+    return Response(
+        "Forbidden",
+        status=403
+    )
+
+
+# =========================================================
+# 📩 ESTRAZIONE MESSAGGIO WEBHOOK
+# =========================================================
+def extract_instagram_message(payload):
+    """
+    Estrae il primo messaggio utile dal payload
+    webhook Instagram/Meta.
+    """
+
+    entries = payload.get(
+        "entry",
+        []
+    )
+
+    if not entries:
+        return None
+
+    for entry in entries:
+
+        messaging = entry.get(
+            "messaging",
+            []
+        )
+
+        for event in messaging:
+
+            sender = event.get(
+                "sender",
+                {}
             )
 
-            if not instagram_token:
-                print("INSTAGRAM_TOKEN mancante")
+            message = event.get(
+                "message",
+                {}
+            )
 
-                return Response.json(
-                    {
-                        "ok": False,
-                        "error": "Configurazione Instagram mancante"
-                    },
-                    status=500
-                )
+            if not sender or not message:
+                continue
 
-            # =========================================================
-            # 📄 CARICAMENTO PROMPT
-            # =========================================================
-            prompt_data = await load_prompt(self.env)
+            message_id = message.get(
+                "mid"
+            )
 
-            # =========================================================
-            # 🔁 ROTAZIONE GEMINI
-            # =========================================================
-            gemini_api_key = get_rotated_gemini_key(self.env)
+            text = message.get(
+                "text"
+            )
 
-            if not gemini_api_key:
-                return Response(
-                    "Orario inattivo."
-                )
+            sender_id = sender.get(
+                "id"
+            )
 
-            # =========================================================
-            # 📩 RECUPERO CONVERSAZIONI
-            # =========================================================
-            convo_data = await get_instagram_conversations(
-                instagram_token
+            timestamp = event.get(
+                "timestamp"
             )
 
             if (
-                "data" not in convo_data
-                or not convo_data["data"]
+                not message_id
+                or not text
+                or not sender_id
             ):
-                return Response(
-                    "Nessun messaggio."
-                )
+                continue
 
-            last_convo = convo_data["data"][0]
+            return {
+                "id": str(message_id),
+                "user_id": str(sender_id),
+                "text": str(text),
+                "timestamp": timestamp
+            }
 
-            messages = (
-                last_convo
-                .get("messages", {})
-                .get("data", [])
+    return None
+
+
+# =========================================================
+# 🤖 ELABORAZIONE MESSAGGIO
+# =========================================================
+async def process_instagram_message(
+    worker,
+    message_data
+):
+    instagram_token = worker.env.INSTAGRAM_TOKEN
+
+    openweather_api_key = getattr(
+        worker.env,
+        "OPENWEATHER_API_KEY",
+        None
+    )
+
+    message_id = message_data["id"]
+    user_id = message_data["user_id"]
+    user_text = message_data["text"]
+
+    # =====================================================
+    # 🚫 DEDUPLICAZIONE
+    # =====================================================
+    try:
+        already_processed = (
+            await is_message_processed(
+                worker.env.DB,
+                message_id
+            )
+        )
+
+        if already_processed:
+            print(
+                "Duplicato ignorato."
             )
 
-            if not messages:
-                return Response(
-                    "Nessun messaggio utile."
-                )
-
-            # =========================================================
-            # 🧠 ORDINE SICURO MESSAGGI
-            # =========================================================
-            sorted_messages = sorted(
-                messages,
-                key=lambda m: m["created_time"]
+            return Response(
+                "OK",
+                status=200
             )
 
-            # =========================================================
-            # 🆔 RECUPERO ID PAGINA
-            # =========================================================
-            page_id = await get_instagram_page_id(
-                instagram_token
-            )
+        await mark_message_processed(
+            worker.env.DB,
+            message_id
+        )
 
-            if not page_id:
-                return Response(
-                    "Errore ID pagina."
-                )
+    except Exception as error:
+        print(
+            f"D1 deduplication error: {error}"
+        )
 
-            last_msg = sorted_messages[-1]
+    # =====================================================
+    # 👤 SALVATAGGIO UTENTE
+    # =====================================================
+    await save_user(
+        worker.env.DB,
+        user_id
+    )
 
-            user_id = last_msg["from"]["id"]
-            user_text = last_msg["message"]
+    # =====================================================
+    # ⏱️ ORARIO
+    # =====================================================
+    now = datetime.now(
+        timezone.utc
+    )
 
-            msg_time = datetime.fromisoformat(
-                last_msg["created_time"]
-                .replace("Z", "+00:00")
-            )
-
-            # =========================================================
-            # 🚫 SELF MESSAGE CHECK
-            # =========================================================
-            if user_id == page_id:
-                return Response(
-                    "Ignorato self message."
-                )
-
-            # =========================================================
-            # 🚫 DEDUPLICAZIONE ROBUSTA
-            # =========================================================
-            try:
-                already_processed = await is_message_processed(
-                    self.env.DB,
-                    last_msg["id"]
-                )
-
-                if already_processed:
-                    return Response(
-                        "Duplicato ignorato."
-                    )
-
-                await mark_message_processed(
-                    self.env.DB,
-                    last_msg["id"]
-                )
-
-            except Exception as error:
-                # D1 non deve bloccare Simone.
-                print(
-                    f"D1 deduplication error: {error}"
-                )
-
-            # =========================================================
-            # 👤 SALVATAGGIO UTENTE
-            # =========================================================
-            try:
-                await save_user(
-                    self.env.DB,
-                    user_id
-                )
-            except Exception as error:
-                print(
-                    f"D1 user error: {error}"
-                )
-
-            # =========================================================
-            # ⏱️ TIMING
-            # =========================================================
-            now = datetime.now(timezone.utc)
-
-            diff_sec = (
-                now - msg_time
-            ).total_seconds()
-
-            if diff_sec < 5:
-                print(
-                    "Messaggio troppo recente."
-                )
-
-            # =========================================================
-            # 🧠 CONTEXT ENGINE
-            # =========================================================
-            context_block = f"""
+    # =====================================================
+    # 🧠 CONTEXT ENGINE
+    # =====================================================
+    context_block = f"""
 📅 Data: {now.strftime('%d/%m/%Y')}
 🕒 Ora: {now.strftime('%H:%M')}
 """
 
-            # =========================================================
-            # 🌤️ METEO INTELLIGENTE
-            # =========================================================
-            trigger_words = [
-                "meteo",
-                "pioggia",
-                "sole",
-                "tempo",
-                "domani",
-                "oggi",
-                "uscire",
-                "evento",
-                "viaggio"
-            ]
+    # =====================================================
+    # 🌤️ METEO INTELLIGENTE
+    # =====================================================
+    trigger_words = [
+        "meteo",
+        "pioggia",
+        "sole",
+        "tempo",
+        "domani",
+        "oggi",
+        "uscire",
+        "evento",
+        "viaggio"
+    ]
 
-            include_weather = any(
-                word in user_text.lower()
-                for word in trigger_words
+    include_weather = any(
+        word in user_text.lower()
+        for word in trigger_words
+    )
+
+    if include_weather:
+
+        cities = [
+            "Verona",
+            "Padova",
+            "Milano"
+        ]
+
+        weather_lines = []
+
+        for city in cities:
+
+            weather = await get_weather(
+                openweather_api_key,
+                city
             )
 
-            if include_weather:
-
-                cities = [
-                    "Verona",
-                    "Padova",
-                    "Milano"
-                ]
-
-                weather_lines = []
-
-                for city in cities:
-
-                    weather = await get_weather(
-                        openweather_api_key,
-                        city
-                    )
-
-                    if weather:
-                        weather_lines.append(
-                            f"{city}: {weather}"
-                        )
-
-                if weather_lines:
-
-                    context_block += (
-                        "\n🌤️ Meteo:\n"
-                        + "\n".join(weather_lines)
-                    )
-
-            # =========================================================
-            # 🧠 PROMPT BUILDING
-            # =========================================================
-            prompt_parts = [
-                {
-                    "text":
-                        prompt_data["system_instruction"]
-                        + "\n"
-                        + context_block
-                        + "\n"
-                }
-            ]
-
-            # =========================================================
-            # 💬 CHAT STRUCTURE MIGLIORATA
-            # =========================================================
-            last_10 = sorted_messages[-10:]
-
-            chat_block = (
-                "\nCONVERSAZIONE RECENTE:\n"
-            )
-
-            for message in last_10:
-
-                role = (
-                    "ASSISTANT"
-                    if message["from"]["id"] == page_id
-                    else "USER"
+            if weather:
+                weather_lines.append(
+                    f"{city}: {weather}"
                 )
 
-                chat_block += (
-                    f"{role}: "
-                    f"{message['message']}\n"
+        if weather_lines:
+            context_block += (
+                "\n🌤️ Meteo:\n"
+                + "\n".join(
+                    weather_lines
                 )
-
-            chat_block += (
-                "\nRispondi in modo coerente "
-                "all'ultimo messaggio dell'utente "
-                "mantenendo il contesto della "
-                "conversazione.\n"
             )
 
-            prompt_parts.append(
-                {
-                    "text": chat_block
-                }
-            )
+    # =====================================================
+    # 🧠 CRONOLOGIA D1
+    # =====================================================
+    recent_messages = (
+        await get_recent_messages(
+            worker.env.DB,
+            user_id,
+            10
+        )
+    )
 
-            prompt_parts.append(
-                {
-                    "text": f"""
+    # =====================================================
+    # 🧠 PROMPT
+    # =====================================================
+    prompt_data = await load_prompt(
+        worker.env
+    )
+
+    prompt_parts = [
+        {
+            "text":
+                prompt_data["system_instruction"]
+                + "\n"
+                + context_block
+                + "\n"
+        }
+    ]
+
+    # =====================================================
+    # 💬 CONVERSAZIONE RECENTE
+    # =====================================================
+    chat_block = (
+        "\nCONVERSAZIONE RECENTE:\n"
+    )
+
+    for message in recent_messages:
+
+        if message["role"] == "assistant":
+            role = "ASSISTANT"
+        else:
+            role = "USER"
+
+        chat_block += (
+            f"{role}: "
+            f"{message['content']}\n"
+        )
+
+    # Aggiungiamo il messaggio appena ricevuto
+    # perché il salvataggio D1 avviene dopo Gemini.
+    chat_block += (
+        f"USER: {user_text}\n"
+    )
+
+    chat_block += (
+        "\nRispondi in modo coerente "
+        "all'ultimo messaggio dell'utente "
+        "mantenendo il contesto della "
+        "conversazione.\n"
+    )
+
+    prompt_parts.append(
+        {
+            "text": chat_block
+        }
+    )
+
+    # =====================================================
+    # 🎯 COMPITO
+    # =====================================================
+    prompt_parts.append(
+        {
+            "text": f"""
 🎯 COMPITO
 
 Analizza il messaggio dell’utente e determina se contiene una richiesta reale.
@@ -631,85 +716,192 @@ REGOLE:
 → rispondi in modo breve e neutro
 
 3. NON continuare storie o conversazioni inventate
+
 4. NON espandere emozioni o scenari non presenti nel messaggio
 
 STILE:
 Simone può essere presente, ma non deve mai sostituire la risposta logica.
 """
-                }
+        }
+    )
+
+    # =====================================================
+    # 🔁 ROTAZIONE GEMINI
+    # =====================================================
+    gemini_api_key = get_rotated_gemini_key(
+        worker.env
+    )
+
+    if not gemini_api_key:
+        print(
+            "Orario Gemini inattivo."
+        )
+
+        return Response(
+            "OK",
+            status=200
+        )
+
+    # =====================================================
+    # 🤖 GENERAZIONE GEMINI
+    # =====================================================
+    try:
+
+        print(
+            "PRIMA DI GEMINI"
+        )
+
+        reply_text = (
+            await generate_gemini_response(
+                gemini_api_key,
+                prompt_parts
+            )
+        )
+
+        print(
+            "DOPO GEMINI"
+        )
+
+    except Exception as error:
+
+        print(
+            f"Gemini error: {error}"
+        )
+
+        reply_text = "😘"
+
+    # =====================================================
+    # ✂️ LIMITAZIONE RISPOSTA
+    # =====================================================
+    if len(reply_text.split()) > 60:
+
+        reply_text = (
+            " ".join(
+                reply_text.split()[:60]
+            )
+            + "..."
+        )
+
+    # =====================================================
+    # 💾 SALVATAGGIO D1
+    # =====================================================
+    try:
+
+        await save_message(
+            worker.env.DB,
+            message_id,
+            user_id,
+            "user",
+            user_text
+        )
+
+        await save_message(
+            worker.env.DB,
+            str(time.time_ns()),
+            user_id,
+            "assistant",
+            reply_text
+        )
+
+    except Exception as error:
+
+        print(
+            f"D1 messages error: {error}"
+        )
+
+    # =====================================================
+    # 📤 RISPOSTA INSTAGRAM
+    # =====================================================
+    await send_instagram_message(
+        instagram_token,
+        user_id,
+        reply_text
+    )
+
+    return Response(
+        "OK",
+        status=200
+    )
+
+
+# =========================================================
+# 🤖 MAIN WORKER
+# =========================================================
+class Default(WorkerEntrypoint):
+
+    async def fetch(self, request):
+
+        try:
+
+            print(
+                f"Funzione avviata: "
+                f"{request.method} {request.url}"
             )
 
-            # =========================================================
-            # 🤖 GENERAZIONE RISPOSTA
-            # =========================================================
-            try:
+            # =================================================
+            # 🌐 HEALTH CHECK
+            # =================================================
+            if request.method == "GET":
 
-                print("PRIMA DI GEMINI")
-
-                reply_text = await generate_gemini_response(
-                    gemini_api_key,
-                    prompt_parts
-                )
-
-                print("DOPO GEMINI")
-
-            except Exception as error:
-
-                print(
-                    f"Gemini error: {error}"
-                )
-
-                reply_text = "😘"
-
-            # =========================================================
-            # ✂️ LIMITAZIONE RISPOSTA
-            # =========================================================
-            if len(reply_text.split()) > 60:
-
-                reply_text = (
-                    " ".join(
-                        reply_text.split()[:60]
+                # La GET /webhook viene usata da Meta
+                # per verificare il webhook.
+                if "/webhook" in request.url:
+                    return await handle_webhook_verification(
+                        request,
+                        self.env
                     )
-                    + "..."
+
+                return Response(
+                    "Simone Worker OK",
+                    status=200
                 )
 
-            # =========================================================
-            # 💾 SALVATAGGIO MESSAGGI D1
-            # =========================================================
-            try:
+            # =================================================
+            # 📩 WEBHOOK POST
+            # =================================================
+            if (
+                request.method == "POST"
+                and "/webhook" in request.url
+            ):
 
-                await save_message(
-                    self.env.DB,
-                    last_msg["id"],
-                    user_id,
-                    "user",
-                    user_text
-                )
-
-                await save_message(
-                    self.env.DB,
-                    str(time.time_ns()),
-                    user_id,
-                    "assistant",
-                    reply_text
-                )
-
-            except Exception as error:
+                payload = await request.json()
+                payload = payload.to_py()
 
                 print(
-                    f"D1 messages error: {error}"
+                    "Webhook Instagram ricevuto"
                 )
 
-            # =========================================================
-            # 📤 INVIO INSTAGRAM
-            # =========================================================
-            await send_instagram_message(
-                instagram_token,
-                user_id,
-                reply_text
-            )
+                message_data = (
+                    extract_instagram_message(
+                        payload
+                    )
+                )
 
-            return Response("OK")
+                # Eventi non-message:
+                # li consideriamo ricevuti correttamente.
+                if not message_data:
+
+                    print(
+                        "Webhook senza messaggio utile."
+                    )
+
+                    return Response(
+                        "OK",
+                        status=200
+                    )
+
+                return await process_instagram_message(
+                    self,
+                    message_data
+                )
+
+            # =================================================
+            # 🚫 ALTRI POST
+            # =================================================
+            return Response(
+                "Not Found",
+                status=404
+            )
 
         except Exception as error:
 
@@ -724,3 +916,4 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
                 },
                 status=500
             )
+```
