@@ -1,4 +1,3 @@
-```python
 from workers import WorkerEntrypoint, Response
 
 from datetime import datetime, timezone
@@ -916,4 +915,3 @@ class Default(WorkerEntrypoint):
                 },
                 status=500
             )
-```
