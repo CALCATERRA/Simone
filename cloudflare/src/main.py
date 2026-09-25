@@ -143,10 +143,12 @@ async def generate_gemini_response(api_key, prompt_parts):
                 .get("content", {})
                 .get("parts", [])
             )
+
             if not parts:
                 raise ValueError("No response parts")
 
             text_parts = []
+
             for part in parts:
                 if "text" in part:
                     text_parts.append(part["text"])
@@ -176,6 +178,8 @@ async def generate_gemini_response(api_key, prompt_parts):
                 f"Gemini HTTP {response.status}: "
                 f"{error_text}"
             )
+
+
 # =========================================================
 # 🚫 DEDUPLICAZIONE PERSISTENTE D1
 # =========================================================
@@ -274,6 +278,10 @@ async def save_user(
             f"D1 save user error: {error}"
         )
 
+
+# =========================================================
+# 🧠 MEMORIA PERSISTENTE D1
+# =========================================================
 async def save_memory(
     db,
     instagram_user_id,
@@ -302,10 +310,17 @@ async def save_memory(
             memory_key,
             memory_value
         ).run()
-    except Exception as error:
-        print(f"D1 save memory error: {error}")
 
-async def get_memory(db, instagram_user_id):
+    except Exception as error:
+        print(
+            f"D1 save memory error: {error}"
+        )
+
+
+async def get_memory(
+    db,
+    instagram_user_id
+):
     try:
         result = await db.prepare(
             """
@@ -314,12 +329,19 @@ async def get_memory(db, instagram_user_id):
             WHERE instagram_user_id = ?
             ORDER BY updated_at ASC
             """
-        ).bind(instagram_user_id).run()
+        ).bind(
+            instagram_user_id
+        ).run()
 
         return list(result.results)
 
     except Exception as error:
-        print(f"D1 memory error: {error}")
+        print(
+            f"D1 memory error: {error}"
+        )
+
+        return []
+
 
 # =========================================================
 # 🧠 RECUPERO CRONOLOGIA DA D1
@@ -379,6 +401,7 @@ async def send_instagram_message(
     }
 
     headers = Headers.new()
+
     headers.set(
         "Content-Type",
         "application/json"
@@ -429,9 +452,11 @@ async def handle_webhook_verification(
             params[key] = value
 
     mode = params.get("hub.mode")
+
     verify_token = params.get(
         "hub.verify_token"
     )
+
     challenge = params.get(
         "hub.challenge"
     )
@@ -666,14 +691,19 @@ async def process_instagram_message(
     # =====================================================
     # 🧠 CRONOLOGIA D1
     # =====================================================
-recent_messages = await get_recent_messages(
-    worker.env.DB, user_id, 10
-)
+    recent_messages = await get_recent_messages(
+        worker.env.DB,
+        user_id,
+        10
+    )
 
-persistent_memory = await get_memory(
-    worker.env.DB, user_id
-)
-
+    # =====================================================
+    # 🧠 MEMORIA PERSISTENTE D1
+    # =====================================================
+    persistent_memory = await get_memory(
+        worker.env.DB,
+        user_id
+    )
 
     # =====================================================
     # 🧠 PROMPT
@@ -692,21 +722,34 @@ persistent_memory = await get_memory(
         }
     ]
 
-memory_block = "\nMEMORIA PERSISTENTE DELL'UTENTE:\n"
+    # =====================================================
+    # 🧠 MEMORIA PERSISTENTE NEL PROMPT
+    # =====================================================
+    memory_block = (
+        "\nMEMORIA PERSISTENTE DELL'UTENTE:\n"
+    )
 
-if persistent_memory:
-    for memory in persistent_memory:
+    if persistent_memory:
+
+        for memory in persistent_memory:
+
+            memory_block += (
+                f"- [{memory['memory_type']}] "
+                f"{memory['memory_key']}: "
+                f"{memory['memory_value']}\n"
+            )
+
+    else:
+
         memory_block += (
-            f"- [{memory['memory_type']}] "
-            f"{memory['memory_key']}: "
-            f"{memory['memory_value']}\n"
+            "- Nessuna memoria persistente disponibile.\n"
         )
-else:
-    memory_block += "- Nessuna memoria persistente disponibile.\n"
 
-prompt_parts.append({
-    "text": memory_block
-})
+    prompt_parts.append(
+        {
+            "text": memory_block
+        }
+    )
 
     # =====================================================
     # 💬 CONVERSAZIONE RECENTE
@@ -921,8 +964,12 @@ class Default(WorkerEntrypoint):
             ):
 
                 payload = await request.json()
-                print("WEBHOOK PAYLOAD:", json.dumps(payload))
-                
+
+                print(
+                    "WEBHOOK PAYLOAD:",
+                    json.dumps(payload)
+                )
+
                 print(
                     "Webhook Instagram ricevuto"
                 )
