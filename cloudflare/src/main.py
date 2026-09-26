@@ -3,6 +3,7 @@ from workers import WorkerEntrypoint, Response
 from datetime import datetime, timezone
 import json
 import time
+import re
 
 from js import fetch, Headers
 
@@ -370,6 +371,7 @@ async def get_memory(
             SELECT memory_type, memory_key, memory_value
             FROM memory
             WHERE instagram_user_id = ?
+            AND memory_key != 'user_name'
             ORDER BY updated_at ASC
             """
         ).bind(
@@ -387,6 +389,61 @@ async def get_memory(
 
 
 # =========================================================
+# 🔎 CONTROLLO NOME ESPLICITO
+# =========================================================
+def has_explicit_name_declaration(
+    user_message
+):
+    """
+    Restituisce True solamente quando l'utente
+    dichiara esplicitamente il proprio nome.
+
+    Esempi validi:
+
+    Mi chiamo Simone
+    Mi chiamo Dimitri
+    Il mio nome è Marco
+    Sono Luca
+
+    Non sono validi:
+
+    Chi è Dimitri?
+    Conosci Dimitri?
+    Come si chiama Dimitri?
+    Come mi chiamo?
+    Dimitri è bravo
+    Simone dice che mi chiamo Marco
+    """
+
+    if not isinstance(
+        user_message,
+        str
+    ):
+        return False
+
+    text = user_message.strip()
+
+    patterns = [
+        r"^\s*mi\s+chiamo\s+[A-Za-zÀ-ÖØ-öø-ÿ'’-]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ'’-]+)?\s*[.!?]*\s*$",
+
+        r"^\s*il\s+mio\s+nome\s+(?:è|e')\s+[A-Za-zÀ-ÖØ-öø-ÿ'’-]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ'’-]+)?\s*[.!?]*\s*$",
+
+        r"^\s*sono\s+[A-Za-zÀ-ÖØ-öø-ÿ'’-]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ'’-]+)?\s*[.!?]*\s*$"
+    ]
+
+    for pattern in patterns:
+
+        if re.match(
+            pattern,
+            text,
+            re.IGNORECASE
+        ):
+            return True
+
+    return False
+
+
+# =========================================================
 # 🧠 ESTRAZIONE AUTOMATICA MEMORIA
 # =========================================================
 async def extract_memories(
@@ -398,13 +455,17 @@ async def extract_memories(
     memory_context = ""
 
     if existing_memory:
+
         for memory in existing_memory:
+
             memory_context += (
                 f"- [{memory['memory_type']}] "
                 f"{memory['memory_key']}: "
                 f"{memory['memory_value']}\n"
             )
+
     else:
+
         memory_context = (
             "- Nessuna memoria esistente.\n"
         )
@@ -412,6 +473,7 @@ async def extract_memories(
     conversation_context = ""
 
     for message in recent_messages:
+
         conversation_context += (
             f"{message['role']}: "
             f"{message['content']}\n"
@@ -432,6 +494,7 @@ Puoi memorizzare:
 - informazioni importanti sull'utente
 - informazioni importanti sulla relazione tra Simone e l'utente
 - comportamenti che devono avere conseguenze nelle conversazioni future
+- informazioni coerenti su Simone, quando sono chiaramente presenti nella conversazione
 
 Esempi di memoria valida:
 
@@ -452,7 +515,63 @@ relationship / reason / insult
 Se l'utente si è successivamente scusato in modo esplicito,
 puoi rimuovere lo stato apology_required.
 
+=========================================================
+REGOLA IMPORTANTISSIMA SUL NOME DELL'UTENTE
+=========================================================
+
+La memoria:
+
+fact / name
+
+rappresenta ESCLUSIVAMENTE il nome dell'utente.
+
+Puoi creare o modificare:
+
+fact / name
+
+SOLO se l'utente dichiara esplicitamente il proprio nome
+nel messaggio che stai analizzando.
+
+Esempi:
+
+"Mi chiamo Simone"
+→ fact / name / Simone
+
+"Il mio nome è Dimitri"
+→ fact / name / Dimitri
+
+"Sono Marco"
+→ fact / name / Marco
+
+NON devi invece modificare il nome quando l'utente dice:
+
+"Chi è Dimitri?"
+"Conosci Dimitri?"
+"Come si chiama Dimitri?"
+"Parlami di Dimitri"
+"Come mi chiamo?"
+"Dimitri è mio amico"
+"Hai mai sentito parlare di Marco?"
+
+Queste frasi NON dichiarano che l'utente si chiama Dimitri
+o Marco.
+
+Anche se nelle conversazioni precedenti Simone ha scritto
+che l'utente si chiama Marco, questa informazione NON è
+sufficiente per modificare fact / name.
+
+NON usare mai una frase scritta da ASSISTANT come prova
+del nome dell'utente.
+
+NON creare la chiave "user_name".
+Per il nome dell'utente usa esclusivamente:
+
+fact / name
+
+=========================================================
+
 IMPORTANTE:
+
 - Non inventare informazioni.
 - Non salvare informazioni solo perché potrebbero essere utili.
 - Salva solo ciò che è chiaramente espresso o fortemente implicato
@@ -485,6 +604,7 @@ Rispondi ESCLUSIVAMENTE con JSON valido nel seguente formato:
 }}
 
 Sono consentiti solo:
+
 action = "upsert" oppure "delete"
 
 memory_type = "fact", "preference", "relationship"
@@ -494,6 +614,7 @@ Non aggiungere spiegazioni.
 """
 
     try:
+
         response = await generate_gemini_response(
             api_key,
             [
@@ -509,6 +630,7 @@ Non aggiungere spiegazioni.
         response = response.strip()
 
         if response.startswith("```"):
+
             response = response.replace(
                 "```json",
                 "",
@@ -526,12 +648,16 @@ Non aggiungere spiegazioni.
             []
         )
 
-        if not isinstance(memories, list):
+        if not isinstance(
+            memories,
+            list
+        ):
             return []
 
         return memories
 
     except Exception as error:
+
         print(
             f"Memory extraction error: {error}"
         )
@@ -539,10 +665,14 @@ Non aggiungere spiegazioni.
         return []
 
 
+# =========================================================
+# 🧠 APPLICAZIONE MEMORIA
+# =========================================================
 async def apply_memory_updates(
     db,
     instagram_user_id,
-    memories
+    memories,
+    user_message
 ):
     allowed_types = {
         "fact",
@@ -555,14 +685,32 @@ async def apply_memory_updates(
         "delete"
     }
 
+    explicit_name = (
+        has_explicit_name_declaration(
+            user_message
+        )
+    )
+
     for memory in memories:
 
-        if not isinstance(memory, dict):
+        if not isinstance(
+            memory,
+            dict
+        ):
             continue
 
-        action = memory.get("action")
-        memory_type = memory.get("memory_type")
-        memory_key = memory.get("memory_key")
+        action = memory.get(
+            "action"
+        )
+
+        memory_type = memory.get(
+            "memory_type"
+        )
+
+        memory_key = memory.get(
+            "memory_key"
+        )
+
         memory_value = memory.get(
             "memory_value",
             ""
@@ -580,9 +728,49 @@ async def apply_memory_updates(
         ):
             continue
 
-        if not memory_key.strip():
+        memory_key = memory_key.strip()
+
+        if not memory_key:
             continue
 
+        # =================================================
+        # 🔒 NORMALIZZAZIONE NOME UTENTE
+        # =================================================
+        #
+        # "user_name" non deve diventare una seconda
+        # memoria separata dal vero campo "name".
+        #
+        if (
+            memory_type == "fact"
+            and memory_key.lower() == "user_name"
+        ):
+            memory_key = "name"
+
+        # =================================================
+        # 🔒 PROTEZIONE RIGIDA DEL NOME
+        # =================================================
+        #
+        # Gemini può proporre qualsiasi memoria,
+        # ma Python decide se il nome può essere modificato.
+        #
+        if (
+            memory_type == "fact"
+            and memory_key == "name"
+        ):
+
+            if not explicit_name:
+
+                print(
+                    "Memoria nome ignorata: "
+                    "nessuna dichiarazione esplicita "
+                    "del nome da parte dell'utente."
+                )
+
+                continue
+
+        # =================================================
+        # 🗑️ DELETE
+        # =================================================
         if action == "delete":
 
             await delete_memory(
@@ -594,6 +782,9 @@ async def apply_memory_updates(
 
             continue
 
+        # =================================================
+        # 💾 UPSERT
+        # =================================================
         if not isinstance(
             memory_value,
             str
@@ -629,6 +820,7 @@ async def get_recent_messages(
     limit=10
 ):
     try:
+
         result = await db.prepare(
             """
             SELECT role, content, created_at
@@ -651,6 +843,7 @@ async def get_recent_messages(
         return messages
 
     except Exception as error:
+
         print(
             f"D1 history error: {error}"
         )
@@ -701,6 +894,7 @@ async def send_instagram_message(
     )
 
     if not response.ok:
+
         error_text = await response.text()
 
         raise RuntimeError(
@@ -721,6 +915,7 @@ async def handle_webhook_verification(
     query_string = ""
 
     if "?" in url:
+
         query_string = url.split(
             "?",
             1
@@ -764,6 +959,7 @@ async def handle_webhook_verification(
         and verify_token == expected_token
         and challenge
     ):
+
         print(
             "Webhook Meta verificato correttamente"
         )
@@ -1160,6 +1356,31 @@ Non ignorare l'offesa solo perché non compare nella conversazione recente.
 L'utente deve esprimere una vera scusa prima che questo stato possa
 essere considerato superato.
 
+6. La memoria "fact / name" rappresenta il nome dell'utente.
+
+Il nome dell'utente deve essere considerato affidabile quando
+è presente nella memoria persistente.
+
+Una domanda dell'utente su una persona NON significa che
+quella persona sia l'utente.
+
+Esempio:
+
+USER: "Chi è Dimitri?"
+
+Questo NON significa:
+
+USER = Dimitri
+
+Allo stesso modo:
+
+"Conosci Marco?"
+"Parlami di Luca"
+"Chi è Simone?"
+"Come si chiama Dimitri?"
+
+non modificano il nome dell'utente.
+
 STILE:
 Simone può essere presente, ma non deve mai sostituire la risposta logica.
 """
@@ -1215,7 +1436,8 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
         await apply_memory_updates(
             worker.env.DB,
             user_id,
-            memory_updates
+            memory_updates,
+            user_text
         )
 
     except Exception as error:
