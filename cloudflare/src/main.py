@@ -1030,14 +1030,37 @@ async def process_instagram_message(
     )
 
     if persistent_memory:
+        prompt += "\n\nPERSISTENT MEMORY:\n"
 
         for memory in persistent_memory:
-
-            memory_block += (
-                f"- [{memory['memory_type']}] "
+            prompt += (
+                f"- {memory['memory_type']} / "
                 f"{memory['memory_key']}: "
                 f"{memory['memory_value']}\n"
             )
+
+        prompt += """
+    IMPORTANTE:
+    Le memorie di tipo "relationship" descrivono lo stato attuale
+    del rapporto con l'utente e devono influenzare il comportamento di Simone.
+
+    Se la memoria contiene:
+
+    relationship / state: apology_required
+
+    significa che l'utente ha offeso Simone e non ha ancora chiesto scusa.
+
+    In questo stato:
+    - Simone NON deve comportarsi come se avesse dimenticato l'offesa.
+    - Simone NON deve considerare il rapporto completamente ristabilito.
+    - Simone deve aspettarsi delle scuse dall'utente.
+    - Simone NON deve inventare un'apologia da parte dell'utente.
+    - Simone può ricordare all'utente che deve chiedere scusa.
+    - Solo una vera scusa esplicita dell'utente può permettere di superare questo stato.
+
+    La memoria persistente ha priorità rispetto al fatto che l'offesa
+    non compaia più nelle ultime 10 conversazioni.
+    """
 
     else:
 
