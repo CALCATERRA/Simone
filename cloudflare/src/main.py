@@ -397,22 +397,6 @@ def has_explicit_name_declaration(
     """
     Restituisce True solamente quando l'utente
     dichiara esplicitamente il proprio nome.
-
-    Esempi validi:
-
-    Mi chiamo Simone
-    Mi chiamo Dimitri
-    Il mio nome è Marco
-    Sono Luca
-
-    Non sono validi:
-
-    Chi è Dimitri?
-    Conosci Dimitri?
-    Come si chiama Dimitri?
-    Come mi chiamo?
-    Dimitri è bravo
-    Simone dice che mi chiamo Marco
     """
 
     if not isinstance(
@@ -434,6 +418,55 @@ def has_explicit_name_declaration(
     for pattern in patterns:
 
         if re.match(
+            pattern,
+            text,
+            re.IGNORECASE
+        ):
+            return True
+
+    return False
+
+
+# =========================================================
+# 🔎 CONTROLLO SCUSA ESPLICITA
+# =========================================================
+def has_explicit_apology(
+    user_message
+):
+    """
+    Restituisce True quando l'utente esprime
+    una vera scusa in modo esplicito.
+
+    Serve anche durante la generazione della risposta:
+    la memoria D1 viene aggiornata dopo la risposta,
+    quindi Gemini deve poter considerare la scusa
+    già valida nel messaggio corrente.
+    """
+
+    if not isinstance(
+        user_message,
+        str
+    ):
+        return False
+
+    text = user_message.strip().lower()
+
+    apology_patterns = [
+        r"\bscusa\b",
+        r"\bscusami\b",
+        r"\bmi dispiace\b",
+        r"\bti chiedo scusa\b",
+        r"\bti chiedo scusa per\b",
+        r"\bchiedo scusa\b",
+        r"\bsono dispiaciuto\b",
+        r"\bsono dispiaciuta\b",
+        r"\bperdonami\b",
+        r"\bti prego di perdonarmi\b"
+    ]
+
+    for pattern in apology_patterns:
+
+        if re.search(
             pattern,
             text,
             re.IGNORECASE
@@ -507,13 +540,26 @@ Per la relazione puoi usare:
 
 relationship / state / apology_required
 relationship / reason / insult
+relationship / status / valued_connection
 
 Se l'utente ha insultato Simone, puoi impostare:
 relationship / state / apology_required
 relationship / reason / insult
 
 Se l'utente si è successivamente scusato in modo esplicito,
-puoi rimuovere lo stato apology_required.
+puoi rimuovere lo stato apology_required e le eventuali
+memorie direttamente collegate a quello stato, come
+relationship / reason / insult.
+
+Una scusa esplicita deve essere considerata sufficiente
+per chiudere quello specifico conflitto.
+
+Non devi riaprire un conflitto già chiuso solo perché
+nella cronologia precedente esistono messaggi in cui
+Simone chiedeva delle scuse.
+
+Le memorie relationship presenti nella memoria esistente
+rappresentano lo stato relazionale persistente e attuale.
 
 =========================================================
 REGOLA IMPORTANTISSIMA SUL NOME DELL'UTENTE
@@ -580,6 +626,12 @@ IMPORTANTE:
   versione della stessa chiave.
 - Se una memoria non deve più esistere, usa action "delete".
 - Se non c'è nulla da memorizzare, restituisci una lista vuota.
+- Non cancellare una memoria positiva o stabile solo perché
+  l'utente ha avuto un momento negativo, a meno che il nuovo
+  messaggio renda chiaramente obsoleta quella memoria.
+- Uno stato conflittuale momentaneo come apology_required
+  non significa automaticamente che ogni precedente memoria
+  positiva sulla relazione debba essere cancellata.
 
 MEMORIA ESISTENTE:
 {memory_context}
@@ -1212,6 +1264,31 @@ async def process_instagram_message(
             break
 
     # =====================================================
+    # 🔎 STATO RELAZIONALE ATTUALE
+    # =====================================================
+    apology_required = False
+
+    for memory in persistent_memory:
+
+        if (
+            memory["memory_type"] == "relationship"
+            and memory["memory_key"] == "state"
+            and memory["memory_value"] == "apology_required"
+        ):
+
+            apology_required = True
+            break
+
+    # =====================================================
+    # 🔎 SCUSA NEL MESSAGGIO CORRENTE
+    # =====================================================
+    current_message_is_apology = (
+        has_explicit_apology(
+            user_text
+        )
+    )
+
+    # =====================================================
     # 🧠 PROMPT
     # =====================================================
     prompt_data = await load_prompt(
@@ -1245,43 +1322,95 @@ async def process_instagram_message(
                 f"{memory['memory_value']}\n"
             )
 
-        memory_block += """
-IMPORTANTE:
-
-Le memorie di tipo "relationship" descrivono lo stato
-attuale del rapporto tra Simone e l'utente e devono
-influenzare il comportamento di Simone.
-
-Se è presente:
-
-relationship / state: apology_required
-
-significa che l'utente ha offeso Simone e NON ha ancora
-chiesto scusa.
-
-In questo stato:
-
-- Simone NON deve comportarsi come se avesse dimenticato
-  l'offesa.
-- Simone NON deve considerare il rapporto completamente
-  ristabilito.
-- Simone deve aspettarsi delle scuse dall'utente.
-- Simone NON deve inventare un'apologia dell'utente.
-- Simone può ricordare all'utente che deve chiedere scusa.
-- Simone NON deve eliminare o ignorare questo stato solo
-  perché l'offesa non compare nelle ultime 10 conversazioni.
-- Lo stato può essere superato solo quando l'utente esprime
-  una vera scusa in modo esplicito.
-
-La memoria persistente è parte del contesto attuale
-e deve essere utilizzata insieme alla conversazione recente.
-"""
-
     else:
 
         memory_block += (
             "- Nessuna memoria persistente disponibile.\n"
         )
+
+    # =====================================================
+    # ❤️ STATO RELAZIONALE — PRIORITÀ SULLA CRONOLOGIA
+    # =====================================================
+    memory_block += """
+=========================================================
+STATO RELAZIONALE PERSISTENTE — PRIORITÀ
+=========================================================
+
+Le memorie di tipo "relationship" presenti nella memoria
+persistente rappresentano lo stato ATTUALE del rapporto
+tra Simone e l'utente.
+
+La conversazione recente è solo contesto.
+
+Le vecchie frasi generate da ASSISTANT NON possono da sole
+riattivare uno stato relazionale che non è più presente
+nella memoria persistente.
+
+In particolare:
+
+Se in passato l'assistente ha scritto:
+
+"aspetto ancora le tue scuse"
+
+ma nella memoria persistente NON esiste attualmente:
+
+relationship / state: apology_required
+
+NON devi comportarti automaticamente come se le scuse
+fossero ancora dovute.
+
+Una situazione già risolta non deve essere riaperta
+semplicemente perché la cronologia contiene vecchie
+richieste di scuse.
+
+Se invece nella memoria persistente esiste:
+
+relationship / state: apology_required
+
+lo stato è attualmente attivo e deve essere rispettato.
+
+Lo stato apology_required può essere superato quando
+l'utente esprime una vera scusa.
+
+La presenza o assenza di apology_required nella memoria
+persistente è più importante delle vecchie frasi
+dell'assistente nella cronologia.
+
+Una memoria positiva della relazione, come:
+
+relationship / status: valued_connection
+
+descrive invece un aspetto della relazione e non deve
+essere automaticamente cancellata solo perché esiste
+un conflitto momentaneo.
+=========================================================
+"""
+
+    # =====================================================
+    # ❤️ SCUSA NEL MESSAGGIO CORRENTE
+    # =====================================================
+    if apology_required and current_message_is_apology:
+
+        memory_block += """
+=========================================================
+SCUSA NEL MESSAGGIO CORRENTE
+=========================================================
+
+L'utente ha espresso una scusa esplicita nel messaggio
+che stai elaborando.
+
+Considera quindi la richiesta di scuse soddisfatta
+GIÀ PER QUESTA RISPOSTA.
+
+Non rispondere dicendo che l'utente deve ancora scusarsi.
+
+Puoi riconoscere la scusa e considerare il conflitto
+in fase di risoluzione.
+
+La memoria D1 verrà aggiornata subito dopo la generazione
+della risposta.
+=========================================================
+"""
 
     prompt_parts.append(
         {
@@ -1361,12 +1490,19 @@ relationship / state: apology_required
 
 devi rispettare questo stato nella risposta.
 
-Non comportarti come se il rapporto fosse già stato ristabilito.
-Non ignorare l'offesa solo perché non compare nella conversazione recente.
-L'utente deve esprimere una vera scusa prima che questo stato possa
-essere considerato superato.
+Tuttavia, se il messaggio corrente contiene una vera
+scusa esplicita, considera la scusa già espressa.
 
-6. La memoria "fact / name" rappresenta il nome dell'utente.
+NON dire che l'utente deve ancora scusarsi quando
+l'utente si è appena scusato esplicitamente.
+
+6. Se nella memoria persistente NON è presente:
+relationship / state: apology_required
+
+non riattivare autonomamente questo stato sulla base
+di vecchie frasi dell'assistente nella cronologia.
+
+7. La memoria "fact / name" rappresenta il nome dell'utente.
 
 Il nome dell'utente deve essere considerato affidabile quando
 è presente nella memoria persistente.
@@ -1403,11 +1539,6 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
     # =====================================================
     # 🔒 BLOCCO IDENTITÀ UTENTE
     # =====================================================
-    #
-    # Questo blocco viene aggiunto ALLA FINE del prompt.
-    # In questo modo il nome memorizzato viene presentato
-    # esplicitamente a Gemini come informazione prioritaria.
-    #
     if user_name:
 
         prompt_parts.append(
@@ -1613,8 +1744,6 @@ class Default(WorkerEntrypoint):
             # =================================================
             if request.method == "GET":
 
-                # La GET /webhook viene usata da Meta
-                # per verificare il webhook.
                 if "/webhook" in request.url:
 
                     return await handle_webhook_verification(
@@ -1652,8 +1781,6 @@ class Default(WorkerEntrypoint):
                     )
                 )
 
-                # Eventi non-message:
-                # li consideriamo ricevuti correttamente.
                 if not message_data:
 
                     print(
