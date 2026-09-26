@@ -736,10 +736,6 @@ async def apply_memory_updates(
         # =================================================
         # 🔒 NORMALIZZAZIONE NOME UTENTE
         # =================================================
-        #
-        # "user_name" non deve diventare una seconda
-        # memoria separata dal vero campo "name".
-        #
         if (
             memory_type == "fact"
             and memory_key.lower() == "user_name"
@@ -749,10 +745,6 @@ async def apply_memory_updates(
         # =================================================
         # 🔒 PROTEZIONE RIGIDA DEL NOME
         # =================================================
-        #
-        # Gemini può proporre qualsiasi memoria,
-        # ma Python decide se il nome può essere modificato.
-        #
         if (
             memory_type == "fact"
             and memory_key == "name"
@@ -1202,6 +1194,24 @@ async def process_instagram_message(
     )
 
     # =====================================================
+    # 👤 IDENTITÀ UTENTE DALLA MEMORIA
+    # =====================================================
+    user_name = None
+
+    for memory in persistent_memory:
+
+        if (
+            memory["memory_type"] == "fact"
+            and memory["memory_key"] == "name"
+        ):
+
+            user_name = (
+                memory["memory_value"]
+            )
+
+            break
+
+    # =====================================================
     # 🧠 PROMPT
     # =====================================================
     prompt_data = await load_prompt(
@@ -1381,11 +1391,93 @@ Allo stesso modo:
 
 non modificano il nome dell'utente.
 
+Le frasi precedentemente generate da ASSISTANT
+NON sono una fonte affidabile per determinare il nome dell'utente.
+
 STILE:
 Simone può essere presente, ma non deve mai sostituire la risposta logica.
 """
         }
     )
+
+    # =====================================================
+    # 🔒 BLOCCO IDENTITÀ UTENTE
+    # =====================================================
+    #
+    # Questo blocco viene aggiunto ALLA FINE del prompt.
+    # In questo modo il nome memorizzato viene presentato
+    # esplicitamente a Gemini come informazione prioritaria.
+    #
+    if user_name:
+
+        prompt_parts.append(
+            {
+                "text": f"""
+=========================================================
+IDENTITÀ DELL'UTENTE — REGOLA PRIORITARIA
+=========================================================
+
+Il nome dell'utente è:
+
+{user_name}
+
+Questa informazione proviene dalla memoria persistente
+ed è affidabile.
+
+Se l'utente chiede:
+
+"Come mi chiamo?"
+"Qual è il mio nome?"
+"Ti ricordi come mi chiamo?"
+"Ti ricordi il mio nome?"
+
+devi rispondere utilizzando il nome:
+
+{user_name}
+
+NON dire:
+"Non lo so"
+"Non me l'hai mai detto"
+"Non ricordo il tuo nome"
+"Non so come ti chiami"
+
+quando questa memoria è presente.
+
+Le eventuali frasi precedentemente generate da ASSISTANT
+che contengono un nome diverso NON possono modificare
+questa informazione.
+
+Se nella cronologia compare, per esempio:
+
+ASSISTANT: "Ti chiami Marco"
+
+ma la memoria dice:
+
+fact / name: {user_name}
+
+il nome dell'utente rimane:
+
+{user_name}
+
+Non chiamare quindi l'utente con il nome presente
+nelle vecchie risposte dell'assistente.
+
+Una persona nominata dall'utente NON è automaticamente
+l'utente.
+
+Esempio:
+
+USER: "Chi è Marco?"
+
+Questo NON significa che l'utente sia Marco.
+
+Il nome dell'utente rimane:
+
+{user_name}
+=========================================================
+"""
+            }
+        )
 
     # =====================================================
     # 🔁 ROTAZIONE GEMINI
