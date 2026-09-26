@@ -316,7 +316,30 @@ async def save_memory(
             f"D1 save memory error: {error}"
         )
 
+async def delete_memory(
+    db,
+    instagram_user_id,
+    memory_type,
+    memory_key
+):
+    try:
+        await db.prepare(
+            """
+            DELETE FROM memory
+            WHERE instagram_user_id = ?
+            AND memory_type = ?
+            AND memory_key = ?
+            """
+        ).bind(
+            instagram_user_id,
+            memory_type,
+            memory_key
+        ).run()
 
+    except Exception as error:
+        print(
+            f"D1 delete memory error: {error}"
+        )
 async def get_memory(
     db,
     instagram_user_id
@@ -341,8 +364,216 @@ async def get_memory(
         )
 
         return []
+async def extract_memories(
+    api_key,
+    user_message,
+    recent_messages,
+    existing_memory
+):
+    memory_context = ""
 
+    if existing_memory:
+        for memory in existing_memory:
+            memory_context += (
+                f"- [{memory['memory_type']}] "
+                f"{memory['memory_key']}: "
+                f"{memory['memory_value']}\n"
+            )
+    else:
+        memory_context = "- Nessuna memoria esistente.\n"
 
+    conversation_context = ""
+
+    for message in recent_messages:
+        conversation_context += (
+            f"{message['role']}: "
+            f"{message['content']}\n"
+        )
+
+    extraction_prompt = f"""
+Sei il modulo di memoria persistente di Simone.
+
+Devi analizzare il nuovo messaggio dell'utente e decidere
+se contiene informazioni importanti da ricordare nel lungo periodo.
+
+NON salvare conversazioni normali, domande casuali, saluti,
+opinioni momentanee o informazioni irrilevanti.
+
+Puoi memorizzare:
+- fatti personali stabili
+- preferenze persistenti
+- informazioni importanti sull'utente
+- informazioni importanti sulla relazione tra Simone e l'utente
+- comportamenti che devono avere conseguenze nelle conversazioni future
+
+Esempi di memoria valida:
+
+fact / name / Marco
+fact / city / Padova
+preference / music / rock
+preference / food / pizza
+
+Per la relazione puoi usare:
+
+relationship / state / apology_required
+relationship / reason / insult
+
+Se l'utente ha insultato Simone, puoi impostare:
+relationship / state / apology_required
+relationship / reason / insult
+
+Se l'utente si è successivamente scusato in modo esplicito,
+puoi rimuovere lo stato apology_required.
+
+IMPORTANTE:
+- Non inventare informazioni.
+- Non salvare informazioni solo perché potrebbero essere utili.
+- Salva solo ciò che è chiaramente espresso o fortemente implicato
+  dal messaggio.
+- Se una memoria esistente viene aggiornata, restituisci una nuova
+  versione della stessa chiave.
+- Se una memoria non deve più esistere, usa action "delete".
+- Se non c'è nulla da memorizzare, restituisci una lista vuota.
+
+MEMORIA ESISTENTE:
+{memory_context}
+
+CONVERSAZIONE RECENTE:
+{conversation_context}
+
+NUOVO MESSAGGIO:
+{user_message}
+
+Rispondi ESCLUSIVAMENTE con JSON valido nel seguente formato:
+
+{{
+  "memories": [
+    {{
+      "action": "upsert",
+      "memory_type": "fact",
+      "memory_key": "name",
+      "memory_value": "Marco"
+    }}
+  ]
+}}
+
+Sono consentiti solo:
+action = "upsert" oppure "delete"
+
+memory_type = "fact", "preference", "relationship"
+
+Non aggiungere markdown.
+Non aggiungere spiegazioni.
+"""
+
+    try:
+        response = await generate_gemini_response(
+            api_key,
+            [
+                {
+                    "text": extraction_prompt
+                }
+            ]
+        )
+
+        if not response:
+            return []
+
+        response = response.strip()
+
+        if response.startswith("```"):
+            response = response.replace(
+                "```json",
+                "",
+                1
+            ).replace(
+                "```",
+                "",
+                1
+            ).strip()
+
+        data = json.loads(response)
+
+        memories = data.get("memories", [])
+
+        if not isinstance(memories, list):
+            return []
+
+        return memories
+
+    except Exception as error:
+        print(
+            f"Memory extraction error: {error}"
+        )
+
+        return []
+async def apply_memory_updates(
+    db,
+    instagram_user_id,
+    memories
+):
+    allowed_types = {
+        "fact",
+        "preference",
+        "relationship"
+    }
+
+    allowed_actions = {
+        "upsert",
+        "delete"
+    }
+
+    for memory in memories:
+        if not isinstance(memory, dict):
+            continue
+
+        action = memory.get("action")
+        memory_type = memory.get("memory_type")
+        memory_key = memory.get("memory_key")
+        memory_value = memory.get("memory_value", "")
+
+        if action not in allowed_actions:
+            continue
+
+        if memory_type not in allowed_types:
+            continue
+
+        if not isinstance(memory_key, str):
+            continue
+
+        if not memory_key.strip():
+            continue
+
+        if action == "delete":
+            await delete_memory(
+                db,
+                instagram_user_id,
+                memory_type,
+                memory_key
+            )
+            continue
+
+        if not isinstance(memory_value, str):
+            continue
+
+        memory_value = memory_value.strip()
+
+        if not memory_value:
+            continue
+
+        if len(memory_key) > 100:
+            continue
+
+        if len(memory_value) > 500:
+            continue
+
+        await save_memory(
+            db,
+            instagram_user_id,
+            memory_type,
+            memory_key,
+            memory_value
+        )
 # =========================================================
 # 🧠 RECUPERO CRONOLOGIA DA D1
 # =========================================================
@@ -855,6 +1086,18 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
                 gemini_api_key,
                 prompt_parts
             )
+            memory_updates = await extract_memories(
+               gemini_key,
+               message_text,
+               recent_messages,
+               persistent_memory
+           )
+
+           await apply_memory_updates(
+               worker.env.DB,
+               user_id,
+               memory_updates
+           )
         )
 
         print(
