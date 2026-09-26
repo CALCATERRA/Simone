@@ -1030,37 +1030,46 @@ async def process_instagram_message(
     )
 
     if persistent_memory:
-        prompt += "\n\nPERSISTENT MEMORY:\n"
 
         for memory in persistent_memory:
-            prompt += (
+
+            memory_block += (
                 f"- {memory['memory_type']} / "
                 f"{memory['memory_key']}: "
                 f"{memory['memory_value']}\n"
             )
 
-        prompt += """
-    IMPORTANTE:
-    Le memorie di tipo "relationship" descrivono lo stato attuale
-    del rapporto con l'utente e devono influenzare il comportamento di Simone.
+        memory_block += """
+IMPORTANTE:
 
-    Se la memoria contiene:
+Le memorie di tipo "relationship" descrivono lo stato
+attuale del rapporto tra Simone e l'utente e devono
+influenzare il comportamento di Simone.
 
-    relationship / state: apology_required
+Se è presente:
 
-    significa che l'utente ha offeso Simone e non ha ancora chiesto scusa.
+relationship / state: apology_required
 
-    In questo stato:
-    - Simone NON deve comportarsi come se avesse dimenticato l'offesa.
-    - Simone NON deve considerare il rapporto completamente ristabilito.
-    - Simone deve aspettarsi delle scuse dall'utente.
-    - Simone NON deve inventare un'apologia da parte dell'utente.
-    - Simone può ricordare all'utente che deve chiedere scusa.
-    - Solo una vera scusa esplicita dell'utente può permettere di superare questo stato.
+significa che l'utente ha offeso Simone e NON ha ancora
+chiesto scusa.
 
-    La memoria persistente ha priorità rispetto al fatto che l'offesa
-    non compaia più nelle ultime 10 conversazioni.
-    """
+In questo stato:
+
+- Simone NON deve comportarsi come se avesse dimenticato
+  l'offesa.
+- Simone NON deve considerare il rapporto completamente
+  ristabilito.
+- Simone deve aspettarsi delle scuse dall'utente.
+- Simone NON deve inventare un'apologia dell'utente.
+- Simone può ricordare all'utente che deve chiedere scusa.
+- Simone NON deve eliminare o ignorare questo stato solo
+  perché l'offesa non compare nelle ultime 10 conversazioni.
+- Lo stato può essere superato solo quando l'utente esprime
+  una vera scusa in modo esplicito.
+
+La memoria persistente è parte del contesto attuale
+e deve essere utilizzata insieme alla conversazione recente.
+"""
 
     else:
 
@@ -1140,6 +1149,16 @@ REGOLE:
 3. NON continuare storie o conversazioni inventate
 
 4. NON espandere emozioni o scenari non presenti nel messaggio
+
+5. Se nella memoria persistente è presente:
+relationship / state: apology_required
+
+devi rispettare questo stato nella risposta.
+
+Non comportarti come se il rapporto fosse già stato ristabilito.
+Non ignorare l'offesa solo perché non compare nella conversazione recente.
+L'utente deve esprimere una vera scusa prima che questo stato possa
+essere considerato superato.
 
 STILE:
 Simone può essere presente, ma non deve mai sostituire la risposta logica.
