@@ -135,8 +135,11 @@ async def generate_gemini_response(api_key, prompt_parts):
             data = data.to_py()
 
             candidates = data.get("candidates", [])
+
             if not candidates:
-                raise ValueError("No response candidates")
+                raise ValueError(
+                    "No response candidates"
+                )
 
             parts = (
                 candidates[0]
@@ -145,24 +148,38 @@ async def generate_gemini_response(api_key, prompt_parts):
             )
 
             if not parts:
-                raise ValueError("No response parts")
+                raise ValueError(
+                    "No response parts"
+                )
 
             text_parts = []
 
             for part in parts:
                 if "text" in part:
-                    text_parts.append(part["text"])
+                    text_parts.append(
+                        part["text"]
+                    )
 
-            reply_text = "".join(text_parts).strip()
+            reply_text = "".join(
+                text_parts
+            ).strip()
 
             if not reply_text:
-                raise ValueError("Empty Gemini response")
+                raise ValueError(
+                    "Empty Gemini response"
+                )
 
             return reply_text
 
         error_text = await response.text()
 
-        if response.status not in (429, 500, 502, 503, 504):
+        if response.status not in (
+            429,
+            500,
+            502,
+            503,
+            504
+        ):
             raise RuntimeError(
                 f"Gemini HTTP {response.status}: "
                 f"{error_text}"
@@ -316,6 +333,7 @@ async def save_memory(
             f"D1 save memory error: {error}"
         )
 
+
 async def delete_memory(
     db,
     instagram_user_id,
@@ -340,6 +358,8 @@ async def delete_memory(
         print(
             f"D1 delete memory error: {error}"
         )
+
+
 async def get_memory(
     db,
     instagram_user_id
@@ -364,6 +384,11 @@ async def get_memory(
         )
 
         return []
+
+
+# =========================================================
+# 🧠 ESTRAZIONE AUTOMATICA MEMORIA
+# =========================================================
 async def extract_memories(
     api_key,
     user_message,
@@ -380,7 +405,9 @@ async def extract_memories(
                 f"{memory['memory_value']}\n"
             )
     else:
-        memory_context = "- Nessuna memoria esistente.\n"
+        memory_context = (
+            "- Nessuna memoria esistente.\n"
+        )
 
     conversation_context = ""
 
@@ -494,7 +521,10 @@ Non aggiungere spiegazioni.
 
         data = json.loads(response)
 
-        memories = data.get("memories", [])
+        memories = data.get(
+            "memories",
+            []
+        )
 
         if not isinstance(memories, list):
             return []
@@ -507,6 +537,8 @@ Non aggiungere spiegazioni.
         )
 
         return []
+
+
 async def apply_memory_updates(
     db,
     instagram_user_id,
@@ -524,13 +556,17 @@ async def apply_memory_updates(
     }
 
     for memory in memories:
+
         if not isinstance(memory, dict):
             continue
 
         action = memory.get("action")
         memory_type = memory.get("memory_type")
         memory_key = memory.get("memory_key")
-        memory_value = memory.get("memory_value", "")
+        memory_value = memory.get(
+            "memory_value",
+            ""
+        )
 
         if action not in allowed_actions:
             continue
@@ -538,22 +574,30 @@ async def apply_memory_updates(
         if memory_type not in allowed_types:
             continue
 
-        if not isinstance(memory_key, str):
+        if not isinstance(
+            memory_key,
+            str
+        ):
             continue
 
         if not memory_key.strip():
             continue
 
         if action == "delete":
+
             await delete_memory(
                 db,
                 instagram_user_id,
                 memory_type,
                 memory_key
             )
+
             continue
 
-        if not isinstance(memory_value, str):
+        if not isinstance(
+            memory_value,
+            str
+        ):
             continue
 
         memory_value = memory_value.strip()
@@ -574,6 +618,8 @@ async def apply_memory_updates(
             memory_key,
             memory_value
         )
+
+
 # =========================================================
 # 🧠 RECUPERO CRONOLOGIA DA D1
 # =========================================================
@@ -596,7 +642,9 @@ async def get_recent_messages(
             limit
         ).run()
 
-        messages = list(result.results)
+        messages = list(
+            result.results
+        )
 
         messages.reverse()
 
@@ -673,16 +721,27 @@ async def handle_webhook_verification(
     query_string = ""
 
     if "?" in url:
-        query_string = url.split("?", 1)[1]
+        query_string = url.split(
+            "?",
+            1
+        )[1]
 
     params = {}
 
     for item in query_string.split("&"):
+
         if "=" in item:
-            key, value = item.split("=", 1)
+
+            key, value = item.split(
+                "=",
+                1
+            )
+
             params[key] = value
 
-    mode = params.get("hub.mode")
+    mode = params.get(
+        "hub.mode"
+    )
 
     verify_token = params.get(
         "hub.verify_token"
@@ -763,6 +822,9 @@ def extract_instagram_message(payload):
             if not sender or not message:
                 continue
 
+            if message.get("is_echo"):
+                continue
+
             message_id = message.get(
                 "mid"
             )
@@ -803,7 +865,9 @@ async def process_instagram_message(
     worker,
     message_data
 ):
-    instagram_token = worker.env.INSTAGRAM_TOKEN
+    instagram_token = (
+        worker.env.INSTAGRAM_TOKEN
+    )
 
     openweather_api_key = getattr(
         worker.env,
@@ -819,6 +883,7 @@ async def process_instagram_message(
     # 🚫 DEDUPLICAZIONE
     # =====================================================
     try:
+
         already_processed = (
             await is_message_processed(
                 worker.env.DB,
@@ -827,6 +892,7 @@ async def process_instagram_message(
         )
 
         if already_processed:
+
             print(
                 "Duplicato ignorato."
             )
@@ -842,6 +908,7 @@ async def process_instagram_message(
         )
 
     except Exception as error:
+
         print(
             f"D1 deduplication error: {error}"
         )
@@ -907,11 +974,13 @@ async def process_instagram_message(
             )
 
             if weather:
+
                 weather_lines.append(
                     f"{city}: {weather}"
                 )
 
         if weather_lines:
+
             context_block += (
                 "\n🌤️ Meteo:\n"
                 + "\n".join(
@@ -1063,6 +1132,7 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
     )
 
     if not gemini_api_key:
+
         print(
             "Orario Gemini inattivo."
         )
@@ -1081,27 +1151,29 @@ Simone può essere presente, ma non deve mai sostituire la risposta logica.
             "PRIMA DI GEMINI"
         )
 
-        reply_text = (
-            await generate_gemini_response(
-                gemini_api_key,
-                prompt_parts
-            )
-            memory_updates = await extract_memories(
-               gemini_key,
-               message_text,
-               recent_messages,
-               persistent_memory
-           )
-
-           await apply_memory_updates(
-               worker.env.DB,
-               user_id,
-               memory_updates
-           )
+        reply_text = await generate_gemini_response(
+            gemini_api_key,
+            prompt_parts
         )
 
         print(
             "DOPO GEMINI"
+        )
+
+        # =================================================
+        # 🧠 ESTRAZIONE MEMORIA
+        # =================================================
+        memory_updates = await extract_memories(
+            gemini_api_key,
+            user_text,
+            recent_messages,
+            persistent_memory
+        )
+
+        await apply_memory_updates(
+            worker.env.DB,
+            user_id,
+            memory_updates
         )
 
     except Exception as error:
@@ -1188,6 +1260,7 @@ class Default(WorkerEntrypoint):
                 # La GET /webhook viene usata da Meta
                 # per verificare il webhook.
                 if "/webhook" in request.url:
+
                     return await handle_webhook_verification(
                         request,
                         self.env
